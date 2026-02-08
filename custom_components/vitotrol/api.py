@@ -99,7 +99,7 @@ class VitotrolAPI:
             f"<AppVersion>{APP_VERSION}</AppVersion>"
             f"<Betriebssystem>{APP_OS}</Betriebssystem>"
             f"<Benutzer>{_xml_escape(self._username)}</Benutzer>"
-            f"<Kennwort>{_xml_escape(self._password)}</Kennwort>"
+            f"<Passwort>{_xml_escape(self._password)}</Passwort>"
             "</Login>"
         )
         await self._send_request("Login", body, store_cookies=True)
@@ -141,16 +141,15 @@ class VitotrolAPI:
         )
         body = (
             "<GetData>"
-            f"<UseCache>false</UseCache>"
-            f"<GeraetId>{device.device_id}</GeraetId>"
             f"<AnlageId>{device.location_id}</AnlageId>"
+            f"<GeraetId>{device.device_id}</GeraetId>"
             f"<DatenpunktIds>{dp_list}</DatenpunktIds>"
             "</GetData>"
         )
         root = await self._send_request("GetData", body)
 
         data: dict[int, str] = {}
-        for dp in root.iter("DatenpunktValueV2"):
+        for dp in root.iter("WerteListe"):
             attr_id = int(_find_text(dp, "DatenpunktId"))
             value = _find_text(dp, "Wert")
             data[attr_id] = value
@@ -219,9 +218,9 @@ class VitotrolAPI:
         """Write a value to the device. Returns a refresh ID."""
         body = (
             "<WriteData>"
-            f"<GeraetId>{device.device_id}</GeraetId>"
             f"<AnlageId>{device.location_id}</AnlageId>"
-            f"<DatenpunktId>{attr_id}</DatenpunktId>"
+            f"<GeraetId>{device.device_id}</GeraetId>"
+            f"<DatapointId>{attr_id}</DatapointId>"
             f"<Wert>{_xml_escape(value)}</Wert>"
             "</WriteData>"
         )
@@ -294,6 +293,7 @@ class VitotrolAPI:
                 f"{k}={v}" for k, v in self._cookies.items()
             )
 
+        _LOGGER.debug("SOAP request: %s", soap_action)
         try:
             async with self._session.post(
                 API_ENDPOINT,
@@ -301,12 +301,15 @@ class VitotrolAPI:
                 headers=headers,
                 timeout=_REQUEST_TIMEOUT,
             ) as resp:
+                _LOGGER.debug("SOAP %s response status: %s", soap_action, resp.status)
                 if store_cookies:
                     for cookie in resp.cookies.values():
                         self._cookies[cookie.key] = cookie.value
 
                 resp_text = await resp.text()
+                _LOGGER.debug("SOAP %s response body: %s", soap_action, resp_text[:2000])
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.debug("SOAP %s connection error: %s", soap_action, err)
             raise VitotrolError(f"Connection error: {err}") from err
 
         try:

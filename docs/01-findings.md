@@ -11,6 +11,7 @@ library by maxatome.
 The API is a SOAP/XML web service originally built for the Vitotrol iOS/Android app.
 
 - **Endpoint**: `https://vitotrolapp.viessmann-climatesolutions.com/app_vitodata/VIIWebService-1.16.0.0/iPhoneWebService.asmx`
+- **WSDL**: `https://vitotrolapp.viessmann-climatesolutions.com/app_vitodata/VIIWebService-1.16.0.0/iPhoneWebService.asmx?wsdl`
 - **Protocol**: SOAP 1.1 over HTTPS
 - **Namespace**: `http://www.e-controlnet.de/services/vii/`
 - **Auth**: Cookie-based session (login returns Set-Cookie, subsequent calls send it back)

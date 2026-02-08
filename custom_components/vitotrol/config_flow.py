@@ -65,9 +65,11 @@ class VitotrolConfigFlow(ConfigFlow, domain=DOMAIN):
             try:
                 await api.login()
                 devices = await api.get_devices()
-            except VitotrolAuthError:
+            except VitotrolAuthError as err:
+                _LOGGER.warning("Authentication failed: %s", err)
                 errors["base"] = "invalid_auth"
-            except (VitotrolError, aiohttp.ClientError):
+            except (VitotrolError, aiohttp.ClientError) as err:
+                _LOGGER.error("Failed to connect to Vitotrol: %s", err)
                 errors["base"] = "cannot_connect"
             else:
                 if not devices:
