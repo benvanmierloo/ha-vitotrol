@@ -8,19 +8,18 @@
 
 A Home Assistant custom integration for **Viessmann heating systems** that use the Vitotrol mobile app. Connects directly to the Viessmann cloud API — no MQTT broker, no extra hardware needed.
 
-If you're coming from [vitotrol2mqtt](https://github.com/benvanmierloo/vitotrol2mqtt), this is the native HA replacement. Same data, better integration.
-
 ## What you get
 
 | Platform | Entities | Description |
 |---|---|---|
 | **Climate** | Heating | HVAC modes (Off / Auto / Heat), ECO and Boost presets, target temperature control |
-| **Sensor** | 12 sensors | Indoor, outdoor, boiler, hot water, smoke, and heating water temperatures. Burner hours, burner starts, operating mode, 3-way valve status, current error |
+| **Sensor** | 12+ sensors | Indoor, outdoor, boiler, hot water, smoke, and heating water temperatures. Burner hours, burner starts, operating mode, 3-way valve status, current error |
 | **Binary sensor** | 6 sensors | Burner, internal pump, heating pump, circulation pump, frost protection, holiday mode |
 | **Switch** | 2 switches | Party mode, energy saving mode |
-| **Number** | 3 controls | Hot water setpoint (10-60 C), reduced temperature setpoint (3-30 C), party mode temperature (10-30 C) |
+| **Number** | 3+ controls | Hot water setpoint, reduced temperature setpoint, party mode temperature |
+| **Select** | Dynamic | Writable enum attributes discovered on your device |
 
-Only entities supported by your specific device are created. The integration automatically discovers which attributes your boiler supports on first setup.
+The integration queries your device for its full attribute catalog (`GetTypeInfo`) on first setup. Well-known attributes (listed above) are enabled by default. All other discovered attributes are created as disabled entities — enable them in the HA entity settings if you need them.
 
 ## Requirements
 
@@ -57,35 +56,9 @@ After setup, click **Configure** on the integration card to adjust options:
 
 ### Scan interval
 
-How often to poll the Viessmann API for new data (default: 60 seconds, range: 30-600 seconds).
+How often to poll the Viessmann API for new data (default: 300 seconds, range: 60-900 seconds).
 
 The Vitotrol API is slow by nature — each data refresh involves telling the boiler to upload data, waiting for completion, then reading it. Lower intervals mean fresher data but more API calls.
-
-### Custom attributes
-
-The integration auto-discovers ~24 known attributes. If your device has additional data points (common with newer Viessmann models), you can add them as custom sensors.
-
-Enter one attribute per line using the format `name-0xHHHH` where `HHHH` is the hex attribute ID:
-
-```
-info_elektrische_leistung-0x2637
-info_thermische_leistung-0x266c
-info_energie_gesamt-0x2e68
-info_waermemenge_fcu-0x2639
-```
-
-Custom attributes appear as sensor entities. The name part becomes the entity name (underscores are converted to spaces).
-
-#### Migrating from vitotrol2mqtt
-
-If you have a working `vitotrol2mqtt.yml` config, copy your custom field names directly into the options text area. Known fields like `IndoorTemp` and `OutdoorTemp` are handled automatically — only paste the custom `name-0xNNNN` entries.
-
-#### Finding custom attribute IDs
-
-Custom attribute IDs can be discovered by:
-- Checking community forums for your boiler model
-- Referencing the [go-vitotrol](https://github.com/maxatome/go-vitotrol) source code
-- Trial and error with hex ranges common for your device type (e.g. `0x2600`-`0x2700`)
 
 ## Climate entity
 
@@ -136,7 +109,7 @@ The Vitotrol API uses a request-wait-poll pattern:
 3. Poll until the upload is confirmed
 4. Read the data
 
-This is inherent to the API design. A 60-second scan interval is a good balance between freshness and API load.
+This is inherent to the API design. The default 300-second scan interval balances freshness against API load.
 
 ## Known limitations
 
