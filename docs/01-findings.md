@@ -29,6 +29,7 @@ The API is a SOAP/XML web service originally built for the Vitotrol iOS/Android 
 | `WriteData` | Write a value to the device. Returns a refresh ID | Fast (~1s) |
 | `RequestWriteStatus` | Poll whether WriteData is done (status 0 = pending) | Fast (~1s) |
 | `GetErrorHistory` | Read error history from device | Fast (~1s) |
+| `GetTypeInfo` | Get all datapoint definitions for a device | Fast (~1s) |
 | `GetTimesheetData` | Read heating schedule for a timesheet ID | Fast (~1s) |
 | `WriteTimesheetData` | Write a heating schedule | Fast (~1s) |
 
@@ -94,6 +95,47 @@ Most installations have 1 location with 1 device.
 <GeraetId>{device_id}</GeraetId>
 <AnlageId>{location_id}</AnlageId>
 ```
+
+### GetTypeInfo — Device Attribute Discovery
+
+The `GetTypeInfo` SOAP operation returns **all available datapoints** for a specific
+device in a single call. This is the proper way to discover which attributes a device
+supports — no binary search or brute-force scanning needed.
+
+**Request**: Takes `AnlageId` + `GeraetId` (no attribute list needed).
+
+**Response**: Returns `TypeInfoListe`, an array of `DatenpunktTypInfo` entries:
+
+| Field | Type | Description |
+|---|---|---|
+| `DatenpunktId` | string | Attribute ID. Plain number for regular attrs (`"5367"`), or `"ID-N"` for enum values (`"92-0"`, `"92-1"`) |
+| `DatenpunktName` | string | Human-readable name (German), e.g. `"Raumtemperatur Ist"` |
+| `DatenpunktTyp` | string | Type name: `"ENUM"`, `"DOUBLE"`, etc. |
+| `DatenpunktTypWert` | byte | Numeric type code |
+| `MinimalWert` | string | Minimum value. For enum value entries (`"ID-N"`), this contains the enum label |
+| `MaximalWert` | string | Maximum value |
+| `EinheitBezeichnung` | string | Unit label, e.g. `"°C"`, `"kW"`, `"h"` |
+| `DatenpunktGruppe` | string | Group/category for UI organization |
+| `HeizkreisId` | string | Heating circuit ID (for circuit-specific attrs) |
+| `Auslieferungswert` | string | Factory default value |
+| `IstLesbar` | bool | **Readable** flag |
+| `IstSchreibbar` | bool | **Writable** flag |
+
+**Enum handling**: Enum attributes appear as multiple entries in the response:
+- First: the base attribute (e.g. ID `"92"`, type `"ENUM"`)
+- Then: one entry per enum value (e.g. `"92-0"`, `"92-1"`, `"92-2"`, ...)
+  - The `MinimalWert` field on these entries contains the enum value label
+  - Example: `"92-0"` has MinimalWert `"Abschaltbetrieb"` (off)
+
+**go-vitotrol reference**: The Go library implements this in `device.go` function
+`GetTypeInfo()`. It parses enum entries by splitting on `-` and building a
+`map[uint32]string` of enum index → label. See `AttributeInfo` and
+`AttributeInfoBase` structs.
+
+**Key insight**: This call eliminates the need for binary-search attribute discovery.
+Instead of probing attributes one-by-one to find which ones a device supports, a
+single `GetTypeInfo` call returns the complete catalog with names, types, units,
+min/max ranges, and read/write flags.
 
 ### Attribute System
 

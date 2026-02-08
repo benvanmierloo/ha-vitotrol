@@ -3,6 +3,11 @@
 Single source of truth for attribute metadata: English names, platform
 routing, units, device classes, and enum translations.  Unknown attributes
 discovered via GetTypeInfo fall back to dynamic behaviour in each platform.
+
+To add a new attribute:
+  1. Add a row to _TABLE  (id, name, enabled, category)
+  2. If it has enums, add an entry to _ENUM_MAPS
+  3. If it's a binary_sensor with non-default on-values, add to _ON_VALUES
 """
 
 from __future__ import annotations
@@ -30,15 +35,15 @@ class AttrMeta:
     """Metadata for a known Vitotrol attribute."""
 
     name: str
-    platform: str | None = None  # "sensor"|"binary_sensor"|"number"|"switch"|"select"|None
+    platform: str | None = None
     enabled_by_default: bool = False
     unit: str | None = None
     device_class: str | None = None
     state_class: str | None = None
     suggested_precision: int | None = None
     entity_category: EntityCategory | None = None
-    on_values: tuple[str, ...] | None = None  # binary_sensor only
-    enum_map: dict[str, str] | None = None  # raw_value -> english label
+    on_values: tuple[str, ...] | None = None
+    enum_map: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -56,540 +61,281 @@ class ClimateMeta:
     vitotrol_to_hvac: dict[str, HVACMode] = field(default_factory=dict)
 
 
-# ---------------------------------------------------------------------------
-# Attribute registry
-# ---------------------------------------------------------------------------
+# ============================================================================
+# Category templates — shared HA metadata for groups of attributes
+# ============================================================================
+# Each key maps to the AttrMeta fields shared by every attribute in that
+# category.  The builder loop below merges these with per-row data.
+
+_CATEGORIES: dict[str, dict] = {
+    # -- Sensor categories ---------------------------------------------------
+    "temp":       dict(platform="sensor", unit=UnitOfTemperature.CELSIUS, device_class=SensorDeviceClass.TEMPERATURE, state_class=SensorStateClass.MEASUREMENT, suggested_precision=1),
+    "power":      dict(platform="sensor", unit=UnitOfPower.WATT, device_class=SensorDeviceClass.POWER, state_class=SensorStateClass.MEASUREMENT),
+    "energy":     dict(platform="sensor", unit=UnitOfEnergy.KILO_WATT_HOUR, device_class=SensorDeviceClass.ENERGY, state_class=SensorStateClass.TOTAL_INCREASING),
+    "energy_h":   dict(platform="sensor", unit=UnitOfEnergy.KILO_WATT_HOUR, device_class=SensorDeviceClass.ENERGY, state_class=SensorStateClass.MEASUREMENT),
+    "pct":        dict(platform="sensor", unit=PERCENTAGE, state_class=SensorStateClass.MEASUREMENT),
+    "duration":   dict(platform="sensor", unit=UnitOfTime.HOURS, device_class=SensorDeviceClass.DURATION, state_class=SensorStateClass.TOTAL_INCREASING),
+    "counter":    dict(platform="sensor", state_class=SensorStateClass.TOTAL_INCREASING),
+    "gas":        dict(platform="sensor", unit=UnitOfVolume.CUBIC_METERS, device_class=SensorDeviceClass.GAS, state_class=SensorStateClass.TOTAL_INCREASING),
+    "weight":     dict(platform="sensor", unit=UnitOfMass.KILOGRAMS, device_class=SensorDeviceClass.WEIGHT, state_class=SensorStateClass.TOTAL_INCREASING),
+    "weight_h":   dict(platform="sensor", unit=UnitOfMass.KILOGRAMS, device_class=SensorDeviceClass.WEIGHT, state_class=SensorStateClass.MEASUREMENT),
+    "enum":       dict(platform="sensor", device_class=SensorDeviceClass.ENUM),
+    "text":       dict(platform="sensor"),
+    "diag":       dict(platform="sensor", entity_category=EntityCategory.DIAGNOSTIC),
+    # -- Binary sensor categories --------------------------------------------
+    "running":    dict(platform="binary_sensor", device_class=BinarySensorDeviceClass.RUNNING, on_values=("1",)),
+    "safety":     dict(platform="binary_sensor", device_class=BinarySensorDeviceClass.SAFETY, on_values=("1",)),
+    "bool":       dict(platform="binary_sensor", on_values=("1",)),
+    # -- Number categories ---------------------------------------------------
+    "num_temp":   dict(platform="number", unit=UnitOfTemperature.CELSIUS, device_class=NumberDeviceClass.TEMPERATURE, entity_category=EntityCategory.CONFIG),
+    "num":        dict(platform="number", entity_category=EntityCategory.CONFIG),
+    # -- Switch / select / none ----------------------------------------------
+    "switch":     dict(platform="switch"),
+    "select":     dict(platform="select"),
+    "none":       dict(),
+}
+
+
+# ============================================================================
+# Attribute table — THE master list.  One row per attribute.
+# ============================================================================
+#
+#   (id,    name,                               enabled, category)
+#
+# • "category" determines platform + unit + device_class + state_class etc.
+# • For enums, add entry to _ENUM_MAPS below.
+# • For binary_sensor on_values != ("1",), add entry to _ON_VALUES below.
+
+_TABLE: list[tuple[int, str, bool, str]] = [
+    # fmt: off
+
+    # ---- Temperature sensors ------------------------------------------------
+    (5367,  "Indoor temperature",                True,   "temp"),
+    (5373,  "Outdoor temperature",               True,   "temp"),
+    (5374,  "Boiler temperature",                True,   "temp"),
+    (5381,  "Hot water temperature",             True,   "temp"),
+    (5372,  "Exhaust gas temperature",           True,   "temp"),
+    (5382,  "Hot water outlet temperature",      True,   "temp"),
+    (6052,  "Heating water outlet temperature",  True,   "temp"),
+    (9786,  "Hot water tank top temperature",    False,  "temp"),
+    (9787,  "Hot water tank bottom temperature", False,  "temp"),
+
+    # ---- Power sensors ------------------------------------------------------
+    (9783,  "Fuel cell electrical power",        False,   "power"),
+    (9836,  "Fuel cell thermal power",           False,   "power"),
+    (9838,  "Peak load burner thermal power",    False,   "power"),
+    (9839,  "Electrical self-consumption",       False,   "power"),
+    (9840,  "Grid electricity draw",             False,   "power"),
+
+    # ---- Energy sensors (cumulative) ----------------------------------------
+    (11880, "Total electrical energy produced",  False,   "energy"),
+    (9785,  "Total fuel cell heat produced",     False,   "energy"),
+
+    # ---- Percentage sensors -------------------------------------------------
+    (4165,  "Burner modulation",                 False,  "pct"),
+    (11252, "Self-consumption ratio",            False,  "pct"),
+    (11959, "Grid draw ratio",                   False,  "pct"),
+
+    # ---- Duration sensors ---------------------------------------------------
+    (104,   "Burner operating hours",            True,   "duration"),
+    (9784,  "Fuel cell operating hours",         False,  "duration"),
+
+    # ---- Counter sensors ----------------------------------------------------
+    (111,   "Burner starts",                     True,   "counter"),
+
+    # ---- Gas sensors --------------------------------------------------------
+    (9844,  "Gas consumption this year",         False,  "gas"),
+    (9843,  "Gas consumption last year",         False,  "gas"),
+
+    # ---- CO2 sensors (cumulative) -------------------------------------------
+    (9846,  "CO2 savings this year",             False,  "weight"),
+    (9845,  "CO2 savings last year",             False,  "weight"),
+
+    # ---- Enum status sensors (see _ENUM_MAPS) ------------------------------
+    (708,   "Current operating mode",            True,   "enum"),
+    (76,    "Party mode status",                 False,  "enum"),
+    (88,    "Energy saving status",              False,  "enum"),
+    (270,   "External mode switch",              False,  "enum"),
+    (7987,  "Heating circuit 1 type",            False,  "enum"),
+    (10761, "Hot water sensor status",           False,  "enum"),
+    (12526, "Fuel cell maintenance status",      False,  "enum"),
+
+    # ---- Other sensors ------------------------------------------------------
+    (7184,  "Current error",                     True,   "text"),
+    (897,   "Error byte",                        False,  "diag"),
+
+    # ---- Binary sensors (see _ON_VALUES for non-default) --------------------
+    (600,   "Burner",                            True,   "running"),
+    (245,   "Internal pump",                     False,   "running"),  # see _ON_VALUES
+    (729,   "Heating circuit pump",              False,   "running"),
+    (7181,  "Circulation pump",                  False,   "running"),
+    (5280,  "Storage charge pump",               False,   "running"),
+    (714,   "Holiday program",                   False,   "bool"),
+    (717,   "Frost protection",                  False,   "safety"),
+
+    # ---- Number entities ----------------------------------------------------
+    (85,    "Reduced temperature setpoint",      True,   "num_temp"),
+    (79,    "Party mode temperature",            True,   "num_temp"),
+    (11881, "Hot water setpoint",                True,   "num_temp"),
+    (51,    "Hot water setpoint temperature",    True,   "num_temp"),
+    (949,   "Hot water setpoint 2",              False,  "num_temp"),
+    (2869,  "Heating curve slope",               False,  "num"),
+    (2875,  "Heating curve level",               False,  "num"),
+
+    # ---- Switch entities ----------------------------------------------------
+    (7855,  "Party mode",                        True,   "switch"),
+    (7852,  "Energy saving mode",                True,   "switch"),
+
+    # ---- Select entities (see _ENUM_MAPS) -----------------------------------
+    (9782,  "Fuel cell operating mode",          False,   "select"),
+    (801,   "Heating system schema",             False,  "select"),
+    (865,   "Maintenance mode",                  False,  "select"),
+    (990,   "Error manager",                     False,  "select"),
+    (7271,  "Solar controller",                  False,  "select"),
+
+    # ---- No standalone entity (used by climate / not parseable) -------------
+    (92,    "Operating mode",                    False,  "select"),  # also used by climate
+    (82,    "Room temperature setpoint",         False,  "none"),  # climate RW
+    (5385,  "Device date/time",                  False,  "none"),
+    (306,   "Holiday start date",                False,  "none"),
+    (309,   "Holiday end date",                  False,  "none"),
+    (7191,  "Heating schedule",                  False,  "none"),
+    (7192,  "Hot water schedule",                False,  "none"),
+    (7193,  "Circulation schedule",              False,  "none"),
+
+    # fmt: on
+]
+
+
+# ============================================================================
+# Enum maps — keyed by attr_id
+# ============================================================================
+# Used by "enum" category sensors and "select" entities.  The dict values
+# are the English labels shown in HA.
+
+_ENUM_MAPS: dict[int, dict[str, str]] = {
+    # -- Enum status sensors --------------------------------------------------
+    708:   {"0": "Standby", "1": "Reduced", "2": "Normal", "3": "Continuous normal"},
+    76:    {"0": "Off", "1": "On"},
+    88:    {"0": "Off", "1": "On"},
+    270:   {"0": "Off", "1": "On"},
+    7987:  {"0": "Not present", "1": "Direct circuit", "2": "Mixer circuit"},
+    10761: {
+        "0": "OK", "1": "Short circuit", "2": "Open circuit",
+        "3": "Unknown", "4": "Unknown", "5": "Unknown", "6": "Not present",
+    },
+    12526: {
+        "0": "No maintenance required", "1": "Regular maintenance",
+        "2": "Overhaul stop", "3": "End of lifetime",
+    },
+    # -- Select entities ------------------------------------------------------
+    92: {
+        "0": "Off", "1": "DHW only", "2": "Heating + DHW",
+        "3": "Continuous reduced", "4": "Continuous normal",
+    },
+    9782: {
+        "0": "Service mode", "1": "Energy manager on", "2": "Energy manager off",
+        "3": "Shutdown", "4": "CSM", "5": "Party mode",
+        "6": "Holiday on", "7": "Holiday off",
+    },
+    801: {
+        "0": "No HC/storage", "1": "1 A1", "2": "2 A1 + WW", "3": "3 M2",
+        "4": "4 M2 + WW", "5": "5 A1 + M2", "6": "6 A1 + M2 + WW",
+        "7": "7 M2 + M3", "8": "8 M2 + M3 + WW", "9": "9 A1 + M2 + M3",
+        "10": "10 A1 + M2 + M3 + WW",
+    },
+    865:  {"0": "Inactive", "1": "Active"},
+    990:  {"0": "None", "1": "Error manager"},
+    7271: {
+        "0": "None", "1": "Vitosolic 100", "2": "Vitosolic 200",
+        "3": "Solar module SM1", "4": "SM1 with DT2",
+    },
+}
+
+
+# ============================================================================
+# Binary sensor on_values overrides
+# ============================================================================
+# Category "running"/"safety"/"bool" defaults to on_values=("1",).
+# Add overrides here for attrs where other raw values also mean "on".
+
+_ON_VALUES: dict[int, tuple[str, ...]] = {
+    245: ("1", "3"),  # Internal pump: values 1 and 3 both mean "on"
+}
+
+
+# ============================================================================
+# Build ATTRIBUTE_REGISTRY from the table + templates + overrides
+# ============================================================================
 
 ATTRIBUTE_REGISTRY: dict[int, AttrMeta] = {}
 
-# -- Helper to register a batch with shared defaults ----------------------
-
-def _temp_sensor(attr_id: int, name: str, *, enabled: bool = True) -> None:
-    ATTRIBUTE_REGISTRY[attr_id] = AttrMeta(
-        name=name,
-        platform="sensor",
-        enabled_by_default=enabled,
-        unit=UnitOfTemperature.CELSIUS,
-        device_class=SensorDeviceClass.TEMPERATURE,
-        state_class=SensorStateClass.MEASUREMENT,
-        suggested_precision=1,
-    )
-
-# --- Sensors: temperatures ------------------------------------------------
-
-_temp_sensor(5367, "Indoor temperature")
-_temp_sensor(5373, "Outdoor temperature")
-_temp_sensor(5374, "Boiler temperature")
-_temp_sensor(5381, "Hot water temperature")
-_temp_sensor(5372, "Exhaust gas temperature")
-_temp_sensor(5382, "Hot water outlet temperature")
-_temp_sensor(6052, "Heating water outlet temperature")
-_temp_sensor(9786, "Hot water tank top temperature", enabled=False)
-_temp_sensor(9787, "Hot water tank bottom temperature", enabled=False)
-
-# --- Sensors: power -------------------------------------------------------
-
-for _id, _name in (
-    (9783, "Fuel cell electrical power"),
-    (9836, "Fuel cell thermal power"),
-    (9838, "Peak load burner thermal power"),
-    (9839, "Electrical self-consumption"),
-    (9840, "Grid electricity draw"),
-):
+for _id, _name, _enabled, _cat in _TABLE:
+    _merged = {**_CATEGORIES[_cat]}
+    if _id in _ENUM_MAPS:
+        _merged["enum_map"] = _ENUM_MAPS[_id]
+    if _id in _ON_VALUES:
+        _merged["on_values"] = _ON_VALUES[_id]
     ATTRIBUTE_REGISTRY[_id] = AttrMeta(
         name=_name,
-        platform="sensor",
-        enabled_by_default=True,
-        unit=UnitOfPower.WATT,
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-    )
-
-# --- Sensors: energy ------------------------------------------------------
-
-for _id, _name in (
-    (11880, "Total electrical energy produced"),
-    (9785, "Total fuel cell heat produced"),
-):
-    ATTRIBUTE_REGISTRY[_id] = AttrMeta(
-        name=_name,
-        platform="sensor",
-        enabled_by_default=True,
-        unit=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-    )
-
-# --- Sensors: percentages ------------------------------------------------
-
-ATTRIBUTE_REGISTRY[4165] = AttrMeta(
-    name="Burner modulation",
-    platform="sensor",
-    unit=PERCENTAGE,
-    state_class=SensorStateClass.MEASUREMENT,
-)
-
-ATTRIBUTE_REGISTRY[11252] = AttrMeta(
-    name="Self-consumption ratio",
-    platform="sensor",
-    enabled_by_default=True,
-    unit=PERCENTAGE,
-    state_class=SensorStateClass.MEASUREMENT,
-)
-
-ATTRIBUTE_REGISTRY[11959] = AttrMeta(
-    name="Grid draw ratio",
-    platform="sensor",
-    enabled_by_default=True,
-    unit=PERCENTAGE,
-    state_class=SensorStateClass.MEASUREMENT,
-)
-
-# --- Sensors: duration ----------------------------------------------------
-
-for _id, _name in (
-    (104, "Burner operating hours"),
-    (9784, "Fuel cell operating hours"),
-):
-    ATTRIBUTE_REGISTRY[_id] = AttrMeta(
-        name=_name,
-        platform="sensor",
-        enabled_by_default=True,
-        unit=UnitOfTime.HOURS,
-        device_class=SensorDeviceClass.DURATION,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-    )
-
-# --- Sensors: counters ----------------------------------------------------
-
-ATTRIBUTE_REGISTRY[111] = AttrMeta(
-    name="Burner starts",
-    platform="sensor",
-    enabled_by_default=True,
-    state_class=SensorStateClass.TOTAL_INCREASING,
-)
-
-# --- Sensors: gas ---------------------------------------------------------
-
-for _id, _name, _enabled in (
-    (9844, "Gas consumption this year", True),
-    (9843, "Gas consumption last year", False),
-):
-    ATTRIBUTE_REGISTRY[_id] = AttrMeta(
-        name=_name,
-        platform="sensor",
         enabled_by_default=_enabled,
-        unit=UnitOfVolume.CUBIC_METERS,
-        device_class=SensorDeviceClass.GAS,
-        state_class=SensorStateClass.TOTAL_INCREASING,
+        **_merged,
     )
 
-# --- Sensors: CO2 ---------------------------------------------------------
 
-for _id, _name, _enabled in (
-    (9846, "CO2 savings this year", True),
-    (9845, "CO2 savings last year", False),
-):
-    ATTRIBUTE_REGISTRY[_id] = AttrMeta(
-        name=_name,
-        platform="sensor",
-        enabled_by_default=_enabled,
-        unit=UnitOfMass.KILOGRAMS,
-        device_class=SensorDeviceClass.WEIGHT,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-    )
+# ============================================================================
+# History sensors (generated — too many for the table)
+# ============================================================================
 
-# --- Sensors: enum status -------------------------------------------------
+def _add_history(ids: list[int], pattern: str, category: str) -> None:
+    """Register a batch of history sensor attributes."""
+    tmpl = _CATEGORIES[category]
+    for i, attr_id in enumerate(ids, start=1):
+        ATTRIBUTE_REGISTRY[attr_id] = AttrMeta(name=pattern.format(i), **tmpl)
 
-ATTRIBUTE_REGISTRY[708] = AttrMeta(
-    name="Current operating mode",
-    platform="sensor",
-    enabled_by_default=True,
-    device_class=SensorDeviceClass.ENUM,
-    enum_map={"0": "Standby", "1": "Reduced", "2": "Normal", "3": "Continuous normal"},
-)
+# Electrical energy — last year monthly (9847-9858)
+_add_history(list(range(9847, 9859)), "Elec. energy last year month {}", "energy_h")
+# Electrical energy — this year monthly (9859-9870)
+_add_history(list(range(9859, 9871)), "Elec. energy this year month {}", "energy_h")
+# Electrical energy — this month daily (9953, 9955-9984; skip 9954)
+_add_history([9953] + list(range(9955, 9985)), "Elec. energy this month day {}", "energy_h")
+# Electrical energy — last month daily (9985-10015)
+_add_history(list(range(9985, 10016)), "Elec. energy last month day {}", "energy_h")
+# CO2 savings — last year monthly (9873, 9875-9885; skip 9874)
+_add_history([9873] + list(range(9875, 9886)), "CO2 savings last year month {}", "weight_h")
+# CO2 savings — this year monthly (9886-9897)
+_add_history(list(range(9886, 9898)), "CO2 savings this year month {}", "weight_h")
+# CO2 savings — this month daily (10016-10046)
+_add_history(list(range(10016, 10047)), "CO2 savings this month day {}", "weight_h")
+# CO2 savings — last month daily (10047-10077)
+_add_history(list(range(10047, 10078)), "CO2 savings last month day {}", "weight_h")
 
-ATTRIBUTE_REGISTRY[76] = AttrMeta(
-    name="Party mode status",
-    platform="sensor",
-    device_class=SensorDeviceClass.ENUM,
-    enum_map={"0": "Off", "1": "On"},
-)
+# Clean up builder variables
+del _id, _name, _enabled, _cat, _merged
 
-ATTRIBUTE_REGISTRY[88] = AttrMeta(
-    name="Energy saving status",
-    platform="sensor",
-    device_class=SensorDeviceClass.ENUM,
-    enum_map={"0": "Off", "1": "On"},
-)
 
-ATTRIBUTE_REGISTRY[270] = AttrMeta(
-    name="External mode switch",
-    platform="sensor",
-    device_class=SensorDeviceClass.ENUM,
-    enum_map={"0": "Off", "1": "On"},
-)
-
-ATTRIBUTE_REGISTRY[7987] = AttrMeta(
-    name="Heating circuit 1 type",
-    platform="sensor",
-    device_class=SensorDeviceClass.ENUM,
-    enum_map={"0": "Not present", "1": "Direct circuit", "2": "Mixer circuit"},
-)
-
-ATTRIBUTE_REGISTRY[10761] = AttrMeta(
-    name="Hot water sensor status",
-    platform="sensor",
-    device_class=SensorDeviceClass.ENUM,
-    enum_map={
-        "0": "OK",
-        "1": "Short circuit",
-        "2": "Open circuit",
-        "3": "Unknown",
-        "4": "Unknown",
-        "5": "Unknown",
-        "6": "Not present",
-    },
-)
-
-ATTRIBUTE_REGISTRY[12526] = AttrMeta(
-    name="Fuel cell maintenance status",
-    platform="sensor",
-    device_class=SensorDeviceClass.ENUM,
-    enum_map={
-        "0": "No maintenance required",
-        "1": "Regular maintenance",
-        "2": "Overhaul stop",
-        "3": "End of lifetime",
-    },
-)
-
-# --- Sensors: other -------------------------------------------------------
-
-ATTRIBUTE_REGISTRY[7184] = AttrMeta(
-    name="Current error",
-    platform="sensor",
-    enabled_by_default=True,
-)
-
-ATTRIBUTE_REGISTRY[897] = AttrMeta(
-    name="Error byte",
-    platform="sensor",
-    entity_category=EntityCategory.DIAGNOSTIC,
-)
-
-# --- Binary sensors -------------------------------------------------------
-
-ATTRIBUTE_REGISTRY[600] = AttrMeta(
-    name="Burner",
-    platform="binary_sensor",
-    enabled_by_default=True,
-    device_class=BinarySensorDeviceClass.RUNNING,
-    on_values=("1",),
-)
-
-ATTRIBUTE_REGISTRY[245] = AttrMeta(
-    name="Internal pump",
-    platform="binary_sensor",
-    enabled_by_default=True,
-    device_class=BinarySensorDeviceClass.RUNNING,
-    on_values=("1", "3"),
-)
-
-ATTRIBUTE_REGISTRY[729] = AttrMeta(
-    name="Heating circuit pump",
-    platform="binary_sensor",
-    enabled_by_default=True,
-    device_class=BinarySensorDeviceClass.RUNNING,
-    on_values=("1",),
-)
-
-ATTRIBUTE_REGISTRY[7181] = AttrMeta(
-    name="Circulation pump",
-    platform="binary_sensor",
-    enabled_by_default=True,
-    device_class=BinarySensorDeviceClass.RUNNING,
-    on_values=("1",),
-)
-
-ATTRIBUTE_REGISTRY[5280] = AttrMeta(
-    name="Storage charge pump",
-    platform="binary_sensor",
-    enabled_by_default=True,
-    device_class=BinarySensorDeviceClass.RUNNING,
-    on_values=("1",),
-)
-
-ATTRIBUTE_REGISTRY[714] = AttrMeta(
-    name="Holiday program",
-    platform="binary_sensor",
-    enabled_by_default=True,
-    on_values=("1",),
-)
-
-ATTRIBUTE_REGISTRY[717] = AttrMeta(
-    name="Frost protection",
-    platform="binary_sensor",
-    enabled_by_default=True,
-    device_class=BinarySensorDeviceClass.SAFETY,
-    on_values=("1",),
-)
-
-# --- Numbers --------------------------------------------------------------
-
-ATTRIBUTE_REGISTRY[85] = AttrMeta(
-    name="Reduced temperature setpoint",
-    platform="number",
-    enabled_by_default=True,
-    unit=UnitOfTemperature.CELSIUS,
-    device_class=NumberDeviceClass.TEMPERATURE,
-    entity_category=EntityCategory.CONFIG,
-)
-
-ATTRIBUTE_REGISTRY[79] = AttrMeta(
-    name="Party mode temperature",
-    platform="number",
-    enabled_by_default=True,
-    unit=UnitOfTemperature.CELSIUS,
-    device_class=NumberDeviceClass.TEMPERATURE,
-    entity_category=EntityCategory.CONFIG,
-)
-
-ATTRIBUTE_REGISTRY[11881] = AttrMeta(
-    name="Hot water setpoint",
-    platform="number",
-    enabled_by_default=True,
-    unit=UnitOfTemperature.CELSIUS,
-    device_class=NumberDeviceClass.TEMPERATURE,
-    entity_category=EntityCategory.CONFIG,
-)
-
-ATTRIBUTE_REGISTRY[51] = AttrMeta(
-    name="Hot water setpoint temperature",
-    platform="number",
-    enabled_by_default=True,
-    unit=UnitOfTemperature.CELSIUS,
-    device_class=NumberDeviceClass.TEMPERATURE,
-    entity_category=EntityCategory.CONFIG,
-)
-
-ATTRIBUTE_REGISTRY[949] = AttrMeta(
-    name="Hot water setpoint 2",
-    platform="number",
-    unit=UnitOfTemperature.CELSIUS,
-    device_class=NumberDeviceClass.TEMPERATURE,
-    entity_category=EntityCategory.CONFIG,
-)
-
-ATTRIBUTE_REGISTRY[2869] = AttrMeta(
-    name="Heating curve slope",
-    platform="number",
-    entity_category=EntityCategory.CONFIG,
-)
-
-ATTRIBUTE_REGISTRY[2875] = AttrMeta(
-    name="Heating curve level",
-    platform="number",
-    entity_category=EntityCategory.CONFIG,
-)
-
-# --- Switches -------------------------------------------------------------
-
-ATTRIBUTE_REGISTRY[7855] = AttrMeta(
-    name="Party mode",
-    platform="switch",
-    enabled_by_default=True,
-)
-
-ATTRIBUTE_REGISTRY[7852] = AttrMeta(
-    name="Energy saving mode",
-    platform="switch",
-    enabled_by_default=True,
-)
-
-# --- Selects --------------------------------------------------------------
-
-ATTRIBUTE_REGISTRY[9782] = AttrMeta(
-    name="Fuel cell operating mode",
-    platform="select",
-    enabled_by_default=True,
-    enum_map={
-        "0": "Service mode",
-        "1": "Energy manager on",
-        "2": "Energy manager off",
-        "3": "Shutdown",
-        "4": "CSM",
-        "5": "Party mode",
-        "6": "Holiday on",
-        "7": "Holiday off",
-    },
-)
-
-ATTRIBUTE_REGISTRY[801] = AttrMeta(
-    name="Heating system schema",
-    platform="select",
-    enum_map={
-        "0": "No HC/storage",
-        "1": "1 A1",
-        "2": "2 A1 + WW",
-        "3": "3 M2",
-        "4": "4 M2 + WW",
-        "5": "5 A1 + M2",
-        "6": "6 A1 + M2 + WW",
-        "7": "7 M2 + M3",
-        "8": "8 M2 + M3 + WW",
-        "9": "9 A1 + M2 + M3",
-        "10": "10 A1 + M2 + M3 + WW",
-    },
-)
-
-ATTRIBUTE_REGISTRY[865] = AttrMeta(
-    name="Maintenance mode",
-    platform="select",
-    enum_map={"0": "Inactive", "1": "Active"},
-)
-
-ATTRIBUTE_REGISTRY[990] = AttrMeta(
-    name="Error manager",
-    platform="select",
-    enum_map={"0": "None", "1": "Error manager"},
-)
-
-ATTRIBUTE_REGISTRY[7271] = AttrMeta(
-    name="Solar controller",
-    platform="select",
-    enum_map={
-        "0": "None",
-        "1": "Vitosolic 100",
-        "2": "Vitosolic 200",
-        "3": "Solar module SM1",
-        "4": "SM1 with DT2",
-    },
-)
-
-# --- Platform=None (used by climate or not entity-worthy) -----------------
-
-ATTRIBUTE_REGISTRY[92] = AttrMeta(name="Operating mode")
-ATTRIBUTE_REGISTRY[82] = AttrMeta(name="Room temperature setpoint")
-ATTRIBUTE_REGISTRY[5385] = AttrMeta(name="Device date/time")
-ATTRIBUTE_REGISTRY[306] = AttrMeta(name="Holiday start date")
-ATTRIBUTE_REGISTRY[309] = AttrMeta(name="Holiday end date")
-ATTRIBUTE_REGISTRY[7191] = AttrMeta(name="Heating schedule")
-ATTRIBUTE_REGISTRY[7192] = AttrMeta(name="Hot water schedule")
-ATTRIBUTE_REGISTRY[7193] = AttrMeta(name="Circulation schedule")
-
-# ---------------------------------------------------------------------------
-# History sensors (generated programmatically)
-# ---------------------------------------------------------------------------
-
-# Electrical energy -- last year monthly (IDs 9847-9858)
-for _i in range(12):
-    ATTRIBUTE_REGISTRY[9847 + _i] = AttrMeta(
-        name=f"Elec. energy last year month {_i + 1}",
-        platform="sensor",
-        unit=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.MEASUREMENT,
-    )
-
-# Electrical energy -- this year monthly (IDs 9859-9870)
-for _i in range(12):
-    ATTRIBUTE_REGISTRY[9859 + _i] = AttrMeta(
-        name=f"Elec. energy this year month {_i + 1}",
-        platform="sensor",
-        unit=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.MEASUREMENT,
-    )
-
-# Electrical energy -- this month daily (IDs 9953, 9955-9984; skip 9954)
-_elec_this_month_ids = [9953] + list(range(9955, 9985))
-for _day, _id in enumerate(_elec_this_month_ids, start=1):
-    ATTRIBUTE_REGISTRY[_id] = AttrMeta(
-        name=f"Elec. energy this month day {_day}",
-        platform="sensor",
-        unit=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.MEASUREMENT,
-    )
-
-# Electrical energy -- last month daily (IDs 9985-10015)
-for _i in range(31):
-    ATTRIBUTE_REGISTRY[9985 + _i] = AttrMeta(
-        name=f"Elec. energy last month day {_i + 1}",
-        platform="sensor",
-        unit=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.MEASUREMENT,
-    )
-
-# CO2 savings -- last year monthly (IDs 9873, 9875-9885; skip 9874)
-_co2_last_year_ids = [9873] + list(range(9875, 9886))
-for _month, _id in enumerate(_co2_last_year_ids, start=1):
-    ATTRIBUTE_REGISTRY[_id] = AttrMeta(
-        name=f"CO2 savings last year month {_month}",
-        platform="sensor",
-        unit=UnitOfMass.KILOGRAMS,
-        device_class=SensorDeviceClass.WEIGHT,
-        state_class=SensorStateClass.MEASUREMENT,
-    )
-
-# CO2 savings -- this year monthly (IDs 9886-9897)
-for _i in range(12):
-    ATTRIBUTE_REGISTRY[9886 + _i] = AttrMeta(
-        name=f"CO2 savings this year month {_i + 1}",
-        platform="sensor",
-        unit=UnitOfMass.KILOGRAMS,
-        device_class=SensorDeviceClass.WEIGHT,
-        state_class=SensorStateClass.MEASUREMENT,
-    )
-
-# CO2 savings -- this month daily (IDs 10016-10046)
-for _i in range(31):
-    ATTRIBUTE_REGISTRY[10016 + _i] = AttrMeta(
-        name=f"CO2 savings this month day {_i + 1}",
-        platform="sensor",
-        unit=UnitOfMass.KILOGRAMS,
-        device_class=SensorDeviceClass.WEIGHT,
-        state_class=SensorStateClass.MEASUREMENT,
-    )
-
-# CO2 savings -- last month daily (IDs 10047-10077)
-for _i in range(31):
-    ATTRIBUTE_REGISTRY[10047 + _i] = AttrMeta(
-        name=f"CO2 savings last month day {_i + 1}",
-        platform="sensor",
-        unit=UnitOfMass.KILOGRAMS,
-        device_class=SensorDeviceClass.WEIGHT,
-        state_class=SensorStateClass.MEASUREMENT,
-    )
-
-# Clean up loop variables from module scope
-del _i, _id, _name, _enabled, _day, _month
-del _elec_this_month_ids, _co2_last_year_ids
-
-# ---------------------------------------------------------------------------
+# ============================================================================
 # Climate configuration
-# ---------------------------------------------------------------------------
+# ============================================================================
 
 CLIMATE_CONFIG = ClimateMeta(
-    current_temp_attr=5367,
-    target_temp_attr=82,
-    operating_mode_attr=92,
-    current_mode_attr=708,
-    burner_state_attr=600,
-    eco_mode_attr=7852,
-    party_mode_attr=7855,
+    current_temp_attr=5367,     # Indoor temperature
+    target_temp_attr=82,        # Room temperature setpoint (RW)
+    operating_mode_attr=92,     # Operating mode (RW, enum 0-4)
+    current_mode_attr=708,      # Current operating mode (RO) {"0": "Standby", "1": "Reduced", "2": "Normal", "3": "Continuous normal"},
+    burner_state_attr=600,      # Burner state (RO)
+    eco_mode_attr=7852,         # Energy saving mode (RW)
+    party_mode_attr=7855,       # Party mode (RW)
     hvac_to_vitotrol={
-        HVACMode.OFF: "0",
-        HVACMode.AUTO: "2",
-        HVACMode.HEAT: "4",
+        HVACMode.OFF: "0",         # Abschalt
+        HVACMode.DRY: "1",         # Nur WW (DHW only)
+        HVACMode.AUTO: "2",        # Heizen + WW (schedule-driven)
     },
     vitotrol_to_hvac={
-        "0": HVACMode.OFF,
-        "1": HVACMode.AUTO,
-        "2": HVACMode.AUTO,
-        "3": HVACMode.HEAT,
-        "4": HVACMode.HEAT,
+        "0": HVACMode.OFF,         # Abschalt
+        "1": HVACMode.DRY,         # Nur WW (DHW only)
+        "2": HVACMode.AUTO,        # Heizen + WW
+        "3": HVACMode.AUTO,        # Dauernd Reduziert (still heating)
+        "4": HVACMode.AUTO,        # Dauernd Normal (still heating)
     },
 )

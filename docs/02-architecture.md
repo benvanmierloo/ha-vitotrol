@@ -87,9 +87,10 @@ A pure async Python port of the `go-vitotrol` SOAP client. No HA dependencies.
 ```
 login() → None
 get_devices() → list[VitotrolDevice]
-refresh_data_wait(device, attr_ids) → None        # fire + poll until done
-get_data(device, attr_ids) → dict[int, str]        # attr_id → raw value string
-write_data_wait(device, attr_id, value) → None     # fire + poll until done
+get_type_info(location_id, device_id) → list[dict] # all datapoint definitions
+refresh_data_wait(device, attr_ids) → None          # fire + poll until done
+get_data(device, attr_ids) → dict[int, str]         # attr_id → raw value string
+write_data_wait(device, attr_id, value) → None      # fire + poll until done
 ```
 
 **Session strategy**: Use HA's shared `aiohttp.ClientSession` (via
@@ -106,27 +107,30 @@ Responsibilities:
 - For each device: RefreshData → wait → GetData
 - Re-authenticates on API errors (login + retry once)
 - Stores data as `dict[int, dict[int, str]]` → `{device_id: {attr_id: value}}`
-- Handles attribute discovery: starts with all known attrs, tracks which ones
-  the device actually supports
+- Calls GetTypeInfo once at setup to discover all device attributes
+- Creates entities for all attributes (known = enabled, others = disabled)
+- Polls only enabled attribute IDs each cycle
+
+**Attribute discovery** (at setup):
+```
+1. Call GetTypeInfo(AnlageId, GeraetId) — single fast call, returns full catalog
+2. Create entities for ALL returned attributes
+3. Known attributes → entity_registry_enabled_default = True
+4. Additional attributes → entity_registry_enabled_default = False
+5. User enables/disables via standard HA UI ("X disabled entities")
+```
 
 **Data flow per update cycle**:
 ```
 1. For each device:
-   a. RefreshData(device, supported_attr_ids)  — triggers device data upload
-   b. Poll RequestRefreshStatus until done     — wait ~8-15s
-   c. GetData(device, supported_attr_ids)      — read values from server
+   a. Build attr_ids list from enabled entities only
+   b. RefreshData(device, attr_ids)             — triggers device data upload
+   c. Poll RequestRefreshStatus until done      — wait ~8-15s
+   d. GetData(device, attr_ids)                 — read values from server
 2. If any step fails:
    a. Re-login
    b. Retry once
    c. If still fails → raise UpdateFailed
-```
-
-**Attribute discovery** (first update only):
-```
-1. Try RefreshData + GetData with all known attribute IDs
-2. If it fails, fall back to GetData only (reads cached/stale data)
-3. Track which attr_ids actually returned values
-4. On subsequent updates, only request attrs that worked before
 ```
 
 ### Layer 3: Config Flow (`config_flow.py`)

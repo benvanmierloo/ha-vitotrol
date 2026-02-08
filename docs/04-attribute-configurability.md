@@ -2,260 +2,174 @@
 
 ## The Problem
 
-Not all Viessmann devices support the same attributes. Additionally, there are
-hundreds of undocumented attributes beyond the ~28 "known" ones. Real users already
-use custom attributes via the `NAME-0xNNNN` pattern:
+Not all Viessmann devices support the same attributes. The Vitotrol SOAP API
+will error on the entire request if you include an unsupported attribute.
+We need to know exactly which attributes a device supports before polling.
 
-```yaml
-# Real-world example from vitotrol2mqtt config
-fields:
-  - IndoorTemp                              # known attribute
-  - OutdoorTemp                             # known attribute
-  - info_elektrische_leistung_fcu_r-0x2637  # custom: electrical power (FCU)
-  - info_thermische_leistung_fcu_r-0x266c   # custom: thermal power (FCU)
-  - info_energie_gesamt_r-0x2e68            # custom: total energy
-  - info_waermemenge_fcu_r-0x2639           # custom: heat quantity (FCU)
-```
+## Solution: GetTypeInfo + Enable-All Pattern
 
-Requesting an unsupported attribute causes the Vitotrol API to error for the
-entire request — so we can't just blindly request everything.
+### Discovery: `GetTypeInfo` API Call
 
-## Three categories of attributes
+The SOAP API has a `GetTypeInfo` operation (see `01-findings.md`) that returns
+**all available datapoints** for a device in a single, fast (~1s) call.
+No binary search, no brute-force scanning.
 
-| Category | Example | Count | How to handle |
-|---|---|---|---|
-| **Known & common** | IndoorTemp, OutdoorTemp, BoilerTemp | ~20 | Auto-discover on first setup |
-| **Known & rare** | CirculationPumpState, HolidaysStatus | ~8 | Auto-discover on first setup |
-| **Custom / undocumented** | `info_energie_gesamt_r-0x2e68` | Hundreds | User adds manually |
+`GetTypeInfo(AnlageId, GeraetId)` returns every attribute the device supports,
+with full metadata: name, type, unit, min/max, read/write flags, enum values,
+group, heating circuit, and factory default.
 
-## Design: Three-tier approach
+The go-vitotrol library implements this in `device.go:GetTypeInfo()`.
 
-### Tier 1: Auto-discovery of known attributes (MVP)
+### UX: Standard HA Enable/Disable Pattern
 
-On first coordinator refresh, probe all known attributes to find which ones
-the device supports.
+Follow the pattern used by most well-built HA integrations:
 
-**Strategy**: Binary search discovery
+1. **Call GetTypeInfo** during setup → get the full device attribute catalog
+2. **Create entities for ALL attributes** the device reports
+3. **Known attributes** (our hardcoded entity definitions) → `entity_registry_enabled_default = True`
+4. **All other attributes** → `entity_registry_enabled_default = False`
+5. **User enables what they want** via standard HA UI ("X disabled entities" on device page)
 
-```
-1. Try RefreshData + GetData with ALL known attribute IDs
-2. If it succeeds → all attributes supported, done
-3. If it fails → split the list in half, try each half
-4. Recurse until we find the exact set of supported attributes
-5. Cache the supported set in config entry data (persists across restarts)
-```
+This means:
+- **No custom selection UI** — standard HA entity enable/disable
+- **No textarea for custom attributes** — everything comes from GetTypeInfo
+- **No binary search discovery** — single API call
+- **No options flow for attribute management** — options flow only has scan interval
+- **Zero custom UX to build or maintain**
 
-This runs once during initial setup (or when the user triggers re-discovery).
-Worst case with ~28 attributes: ~10 API calls × ~10s each = ~2 minutes.
-Acceptable as a one-time setup cost.
+### What the User Sees
 
-**Stored as**:
-```python
-# In config entry data (persistent)
-entry.data["supported_attrs"] = [5367, 5373, 5374, ...]  # list of working attr IDs
-```
-
-Entities are only created for attributes that passed discovery.
-
-### Tier 2: Custom attributes via Options Flow (post-MVP)
-
-Users can add custom attributes through the HA options flow UI.
-
-**Options flow step "custom_attributes"**:
+On the device page in HA:
 
 ```
-┌─────────────────────────────────────────┐
-│  Custom Attributes                      │
-│                                         │
-│  Add custom attribute IDs to poll from  │
-│  your Viessmann device. Use the format  │
-│  name-0xHHHH (e.g. my_sensor-0x2637).  │
-│                                         │
-│  ┌───────────────────────────────────┐  │
-│  │ info_elektrische_leistung-0x2637  │  │
-│  │ info_thermische_leistung-0x266c   │  │
-│  │ info_energie_gesamt-0x2e68        │  │
-│  │ info_waermemenge_fcu-0x2639       │  │
-│  │                                   │  │
-│  └───────────────────────────────────┘  │
-│  (one per line)                         │
-│                                         │
-│              [Submit]                   │
-└─────────────────────────────────────────┘
+Viessmann VT 200 (HO1C)
+────────────────────────
+  Indoor Temperature          21.5 °C
+  Outdoor Temperature          8.2 °C
+  Boiler Temperature          45.3 °C
+  Hot Water Temperature       52.1 °C
+  Burner Status               On
+  Operating Mode              Heat + DHW
+  ...
+
+  24 disabled entities          ← click to browse and enable
 ```
 
-**On submit**:
-1. Parse each line: extract name and hex ID
-2. Validate the hex ID format
-3. Test each new attribute: try GetData for the attr ID
-4. If valid: add to config entry options, create sensor entity
-5. If invalid: show error for the specific failing attribute
+Clicking "24 disabled entities" shows the full list. The user finds an
+attribute they want (e.g. "Elektrische Leistung"), clicks it, toggles
+"Enabled" to on. Standard HA behavior, nothing custom.
 
-**Stored as**:
-```python
-# In config entry options (persistent, user-editable)
-entry.options["custom_attributes"] = [
-    {"name": "info_elektrische_leistung", "attr_id": 9783},  # 0x2637
-    {"name": "info_thermische_leistung", "attr_id": 9836},   # 0x266c
-    {"name": "info_energie_gesamt", "attr_id": 11880},        # 0x2e68
-    {"name": "info_waermemenge_fcu", "attr_id": 9785},        # 0x2639
-]
+## Entity Type Selection
+
+### Known Attributes (enabled by default)
+
+These have hand-crafted entity definitions in our platform files with proper
+device classes, icons, state classes, and translations:
+
+| Platform | Attributes |
+|---|---|
+| `sensor` | Temperatures (indoor, outdoor, boiler, hot water, smoke, etc.), burner hours, burner starts, operating mode, 3-way valve, current error |
+| `binary_sensor` | Burner state, pump statuses, frost protection, holiday mode |
+| `climate` | Main heating control (HVAC mode + preset) |
+| `switch` | Party mode, energy saving mode |
+| `number` | Temperature setpoints (hot water, reduced, party mode) |
+
+### Additional Attributes (disabled by default)
+
+Created dynamically from GetTypeInfo metadata. Entity type is inferred:
+
+| GetTypeInfo metadata | Entity type | Example |
+|---|---|---|
+| DOUBLE + read-only | `sensor` | Electrical power (kW) |
+| DOUBLE + writable + min/max | `number` | Unknown setpoint |
+| ENUM + read-only | `sensor` | Status enum |
+| ENUM + writable | `select` | Mode selector with option labels |
+| Boolean-like (0/1) + read-only | `binary_sensor` | On/off status |
+| Boolean-like (0/1) + writable | `switch` | On/off toggle |
+
+Entity metadata from the API:
+- **Name**: from `DatenpunktName` (German, user can rename in HA UI)
+- **Unit**: from `EinheitBezeichnung` (°C, kW, h, ...)
+- **Device class**: inferred from unit where possible (°C → temperature, kW → power)
+- **Min/max**: from `MinimalWert`/`MaximalWert` (for number entities)
+- **Options**: from enum values (for select entities)
+- **Unique ID**: `{device_id}_attr_{attr_id}`
+
+## Polling Strategy
+
+Only **enabled** entities get polled. The coordinator builds the attribute ID
+list from entities that are currently enabled in the entity registry:
+
+```
+GetTypeInfo (once at setup)
+    → creates entities for ALL attributes
+    → user enables/disables via HA UI
+    → coordinator polls only enabled attribute IDs
+    → RefreshData + GetData with the enabled set
 ```
 
-**Entity creation for custom attributes**:
-- Always created as `sensor` entities
-- Device class: none (user can customize via HA UI entity settings)
-- State class: `SensorStateClass.MEASUREMENT` (safe default)
-- Unit: none (user can set via HA entity customization)
-- Name: derived from the user-provided name part (underscores → spaces, title case)
-  e.g. `info_elektrische_leistung` → "Info Elektrische Leistung"
-- Translation key: not used (dynamic name from user input)
-- Unique ID: `{device_id}_custom_{attr_id_hex}`
-- Entity ID: `sensor.vitotrol_{device_name}_{name}`
+This keeps API requests minimal — we never request attributes the user
+doesn't care about.
 
-### Tier 3: Attribute Scanner (future enhancement)
+## Implementation
 
-A HA service or button entity that probes ranges of attribute IDs to discover
-what the device supports.
+### api.py
 
-**Service: `vitotrol.scan_attributes`**:
-```yaml
-# Service call
-service: vitotrol.scan_attributes
-data:
-  device_id: "12345"
-  start_id: "0x2600"   # hex
-  end_id: "0x2700"     # hex
-```
-
-**Behavior**:
-1. Iterate through the ID range
-2. For each ID, try GetData (no RefreshData needed — just check if server has cached data)
-3. Return list of IDs that returned a value
-4. Fire a persistent notification or event with results
-
-**Output**:
-```
-Scan complete for device VT 200 (HO1C).
-Found 4 responding attributes in range 0x2600-0x2700:
-  0x2637 = 1.23
-  0x2639 = 456.7
-  0x266c = 2.34
-  0x2690 = 0.0
-```
-
-This helps users discover attributes without trial and error.
-Could also be exposed as a button entity "Scan for attributes" that triggers
-the scan and logs results.
-
-## Implementation in the coordinator
-
-The coordinator needs to manage two sets of attributes:
+Add `get_type_info()` method:
 
 ```python
-class VitotrolCoordinator:
-    def __init__(self, ...):
-        # Known attributes that passed auto-discovery
-        self._known_attr_ids: list[int] = []
-
-        # Custom attributes from options flow
-        self._custom_attr_ids: list[int] = []
-
-    @property
-    def all_attr_ids(self) -> list[int]:
-        return self._known_attr_ids + self._custom_attr_ids
+async def get_type_info(
+    self, location_id: int, device_id: int
+) -> list[dict]:
+    """Get all available datapoint definitions for a device."""
 ```
 
-Both sets are polled together in a single RefreshData + GetData cycle.
-The data dict makes no distinction between known and custom — all values
-are stored the same way:
+SOAP request: just `AnlageId` + `GeraetId`, no attribute list needed.
+Response parsing: handle enum pattern where base entries have plain IDs
+(`"92"`) and enum value entries have `"ID-N"` format (`"92-0"`) with the
+label in `MinimalWert`.
 
-```python
-coordinator.data = {
-    device_id: {
-        5367: "21.5",     # known: IndoorTemp
-        9783: "1.23",     # custom: info_elektrische_leistung
-        ...
-    }
-}
-```
+### coordinator.py
 
-## Implementation in entity platforms
+- Call `get_type_info()` once during setup, cache the result
+- Remove binary search discovery entirely
+- Build poll list from enabled entities only
+- Store the attribute catalog for entity platforms to use
 
-**Known attributes** → entity descriptions defined in code (sensor.py, etc.)
-**Custom attributes** → dynamically created sensors in sensor.py's `async_setup_entry`:
+### Entity platforms
 
-```python
-async def async_setup_entry(hass, entry, async_add_entities):
-    # 1. Create entities for known attributes (from SENSOR_DESCRIPTIONS)
-    entities = [...]
+Each platform's `async_setup_entry`:
+1. Create entities for known attributes (from hardcoded descriptions)
+   that exist in the GetTypeInfo catalog → `entity_registry_enabled_default = True`
+2. Create entities for additional attributes from the catalog,
+   using inferred entity types → `entity_registry_enabled_default = False`
 
-    # 2. Create entities for custom attributes (from options)
-    for custom in entry.options.get("custom_attributes", []):
-        if custom["attr_id"] in coordinator.data.get(device_id, {}):
-            entities.append(VitotrolCustomSensor(coordinator, device, custom))
+### config_flow.py
 
-    async_add_entities(entities)
-```
+Options flow simplifies to just scan interval. No attribute management needed.
 
-## Options flow: also allow toggling known attributes
+### What gets removed
 
-For power users, the options flow could also allow enabling/disabling
-specific known attributes. This covers the case where auto-discovery
-includes an attribute the user doesn't want, or misses one they do want.
+- Binary search discovery logic in coordinator
+- Custom attributes textarea in options flow
+- `VitotrolCustomSensor` class
+- `custom_attributes` in config entry options
+- `_apply_custom_attrs()` in `__init__.py`
+- `CONF_CUSTOM_ATTRIBUTES` constant
 
-```
-┌─────────────────────────────────────────┐
-│  Monitored Attributes                   │
-│                                         │
-│  ☑ Indoor temperature                  │
-│  ☑ Outdoor temperature                 │
-│  ☑ Boiler temperature                  │
-│  ☐ Hot water outlet temperature        │
-│  ☑ Smoke temperature                   │
-│  ...                                    │
-│                                         │
-│  Scan interval: [60] seconds            │
-│                                         │
-│              [Submit]                   │
-└─────────────────────────────────────────┘
-```
+## Migration
 
-However, this adds UI complexity. For MVP, auto-discovery with no toggle
-is sufficient. Users can disable individual entities in the HA entity
-settings.
-
-## Migration path from vitotrol2mqtt
-
-Users coming from vitotrol2mqtt have a YAML config with their working
-field list. The options flow text area for custom attributes accepts the
-same `name-0xNNNN` format, making migration straightforward:
-
-```
-# Copy from vitotrol2mqtt.yml fields list, paste custom ones into options:
-info_elektrische_leistung_fcu_r-0x2637
-info_thermische_leistung_fcu_r-0x266c
-info_energie_gesamt_r-0x2e68
-info_waermemenge_fcu_r-0x2639
-```
-
-Known attributes (IndoorTemp, OutdoorTemp, etc.) are handled automatically
-and don't need to be entered.
+Users coming from the current implementation (textarea custom attrs) will
+find their custom attributes already present as disabled entities after the
+migration. They just need to enable them in the HA UI. The textarea data
+can be ignored/cleaned up.
 
 ## Phases
 
-| Phase | What | When |
-|---|---|---|
-| MVP | Auto-discovery of known attributes | Phase 1 |
-| MVP | Custom attributes via options flow | Phase 2 (can follow shortly) |
-| Future | Attribute scanner service | After v1 release |
-| Future | Toggleable known attributes in options | After v1 release |
-
-## Impact on architecture docs
-
-This design adds:
-- **coordinator.py**: attribute discovery logic, dual attr ID lists
-- **config_flow.py**: options flow step for custom attributes
-- **sensor.py**: `VitotrolCustomSensor` class for dynamic custom entities
-- **const.py**: no change (known attributes stay as constants)
-- **api.py**: no change (already works with arbitrary attr IDs)
+| Phase | What |
+|---|---|
+| **1** | Add `get_type_info()` to api.py |
+| **2** | Replace binary search with GetTypeInfo in coordinator |
+| **3** | Create entities for all attributes with proper enable defaults |
+| **4** | Smart entity type inference from metadata |
+| **5** | Remove old custom attribute machinery |

@@ -22,7 +22,7 @@ from .entity import VitotrolEntity
 
 PRESET_NONE = "none"
 PRESET_ECO = "eco"
-PRESET_BOOST = "boost"
+PRESET_PARTY = "boost"
 
 
 async def async_setup_entry(
@@ -86,7 +86,7 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
         if self._cfg.eco_mode_attr is not None and self._cfg.eco_mode_attr in catalog:
             presets.append(PRESET_ECO)
         if self._cfg.party_mode_attr is not None and self._cfg.party_mode_attr in catalog:
-            presets.append(PRESET_BOOST)
+            presets.append(PRESET_PARTY)
         self._attr_preset_modes = presets
 
     def _polling_attr_ids(self) -> set[int]:
@@ -139,6 +139,17 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
     @property
     def hvac_action(self) -> HVACAction | None:
         """Return the current HVAC action."""
+        # DHW-only mode: burner may fire for hot water, show as DRYING
+        requested = self._get_attr_value(self._cfg.operating_mode_attr)
+        if requested == "1":
+            if self._cfg.burner_state_attr is not None:
+                burner_raw = self._get_attr_value(self._cfg.burner_state_attr)
+                if burner_raw == "1":
+                    return HVACAction.DRYING
+                if burner_raw is not None:
+                    return HVACAction.IDLE
+            return HVACAction.IDLE
+
         if self._cfg.current_mode_attr is not None:
             mode_raw = self._get_attr_value(self._cfg.current_mode_attr)
             if mode_raw == "0":
@@ -158,7 +169,7 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
         """Return the current preset mode."""
         if self._cfg.party_mode_attr is not None:
             if self._get_attr_value(self._cfg.party_mode_attr) == "1":
-                return PRESET_BOOST
+                return PRESET_PARTY
         if self._cfg.eco_mode_attr is not None:
             if self._get_attr_value(self._cfg.eco_mode_attr) == "1":
                 return PRESET_ECO
@@ -207,7 +218,7 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
                 self._update_coordinator_data(party_attr, "0")
             self._update_coordinator_data(eco_attr, "1")
 
-        elif preset_mode == PRESET_BOOST and party_attr is not None:
+        elif preset_mode == PRESET_PARTY and party_attr is not None:
             if eco_attr is not None and self._get_attr_value(eco_attr) == "1":
                 await self.coordinator.async_write(
                     self._device, eco_attr, "0"
