@@ -25,9 +25,9 @@ APP_VERSION = "4.3.1"
 APP_OS = "Android"
 
 # Polling defaults
-DEFAULT_SCAN_INTERVAL = 60  # seconds
-MIN_SCAN_INTERVAL = 30
-MAX_SCAN_INTERVAL = 600
+DEFAULT_SCAN_INTERVAL = 300  # seconds
+MIN_SCAN_INTERVAL = 60
+MAX_SCAN_INTERVAL = 900
 
 # Async wait parameters (from go-vitotrol)
 REFRESH_INITIAL_WAIT = 8  # seconds

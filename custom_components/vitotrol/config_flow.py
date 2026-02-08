@@ -18,6 +18,7 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import TextSelector, TextSelectorConfig
 
 from .api import VitotrolAPI, VitotrolAuthError, VitotrolError
 from .const import (
@@ -114,7 +115,9 @@ class VitotrolOptionsFlow(OptionsFlow):
             raw_attrs = user_input.get(CONF_CUSTOM_ATTRIBUTES, "").strip()
 
             if raw_attrs:
-                for line in raw_attrs.splitlines():
+                # Support both newlines and commas as separators
+                entries = re.split(r"[,\n]+", raw_attrs)
+                for line in entries:
                     line = line.strip()
                     if not line:
                         continue
@@ -157,7 +160,7 @@ class VitotrolOptionsFlow(OptionsFlow):
                     ),
                     vol.Optional(
                         CONF_CUSTOM_ATTRIBUTES, default=custom_text
-                    ): str,
+                    ): TextSelector(TextSelectorConfig(multiline=True)),
                 }
             ),
             errors=errors,

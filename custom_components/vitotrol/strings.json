@@ -25,7 +25,7 @@
         "title": "Vitotrol Options",
         "data": {
           "scan_interval": "Scan interval (seconds)",
-          "custom_attributes": "Custom attributes (one per line, format: name-0xHHHH)"
+          "custom_attributes": "Custom attributes (one per line or comma-separated, format: name-0xHHHH)"
         }
       }
     },
