@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import VitotrolAPI, VitotrolAuthError, VitotrolDevice, VitotrolError
-from .const import ALL_READABLE_ATTRIBUTES, DEFAULT_SCAN_INTERVAL, DISCOVERY_TIMEOUT, DOMAIN
+from .api import AttributeTypeInfo, VitotrolAPI, VitotrolAuthError, VitotrolDevice, VitotrolError
+from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, KNOWN_ATTR_IDS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,27 +34,71 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
         )
         self.api = api
         self.devices = devices
-        # Per-device supported attribute tracking: {device_id: list[int]}
-        self._supported_attrs: dict[int, list[int]] = {}
-        self._discovery_done: dict[int, bool] = {}
-        # Custom attribute IDs added by the user via options flow
-        self._custom_attr_ids: list[int] = []
+        # Per-device attribute catalog from GetTypeInfo: {device_id: {attr_id: info}}
+        self._attribute_catalog: dict[int, dict[int, AttributeTypeInfo]] = {}
+        # Per-entity attr_id registrations: {device_id: {entity_uid: {attr_ids}}}
+        self._entity_attr_ids: dict[int, dict[str, set[int]]] = {}
 
-    def set_custom_attr_ids(self, attr_ids: list[int]) -> None:
-        """Update the list of custom attribute IDs to poll."""
-        self._custom_attr_ids = list(attr_ids)
+    def get_attribute_catalog(
+        self, device_id: int
+    ) -> dict[int, AttributeTypeInfo]:
+        """Return the attribute catalog for a device."""
+        return self._attribute_catalog.get(device_id, {})
+
+    async def async_setup_type_info(self) -> None:
+        """Discover all device attributes via GetTypeInfo.
+
+        Must be called before the first data refresh.
+        """
+        for device in self.devices:
+            catalog = await self.api.get_type_info(device)
+            self._attribute_catalog[device.device_id] = catalog
+            _LOGGER.info(
+                "Discovered %d attributes for %s",
+                len(catalog),
+                device.device_name,
+            )
+
+    # ------------------------------------------------------------------
+    # Entity attr_id registration — only registered attrs get polled
+    # ------------------------------------------------------------------
+
+    def register_entity_attrs(
+        self, device_id: int, entity_uid: str, attr_ids: set[int]
+    ) -> None:
+        """Register attr_ids that an entity needs polled."""
+        self._entity_attr_ids.setdefault(device_id, {})[entity_uid] = attr_ids
+
+    def unregister_entity_attrs(
+        self, device_id: int, entity_uid: str
+    ) -> None:
+        """Unregister an entity's attr_ids."""
+        device_entities = self._entity_attr_ids.get(device_id)
+        if device_entities:
+            device_entities.pop(entity_uid, None)
 
     def _get_attr_ids(self, device_id: int) -> list[int]:
-        """Return the full list of attribute IDs to poll for a device."""
-        known = self._supported_attrs.get(device_id, ALL_READABLE_ATTRIBUTES)
-        # Deduplicate while preserving order
-        seen: set[int] = set()
-        result: list[int] = []
-        for aid in known + self._custom_attr_ids:
-            if aid not in seen:
-                seen.add(aid)
-                result.append(aid)
-        return result
+        """Return attr_ids to poll: union of all registered entity needs.
+
+        Before entity setup (first refresh), falls back to KNOWN_ATTR_IDS
+        that the device actually supports.
+        """
+        device_entities = self._entity_attr_ids.get(device_id, {})
+        if device_entities:
+            result: set[int] = set()
+            for attr_ids in device_entities.values():
+                result.update(attr_ids)
+            return list(result)
+
+        # Fallback for first refresh before entities are registered
+        catalog = self._attribute_catalog.get(device_id, {})
+        return [
+            attr_id
+            for attr_id in KNOWN_ATTR_IDS
+            if attr_id in catalog and catalog[attr_id].readable
+        ]
+
+    # ------------------------------------------------------------------
 
     async def async_write(
         self,
@@ -102,23 +145,21 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
             attr_ids = self._get_attr_ids(did)
 
             if not attr_ids:
+                _LOGGER.debug("No attr_ids to poll for %s", device.device_name)
                 result[did] = {}
                 continue
 
-            # Attribute discovery on first run
-            if not self._discovery_done.get(did, False):
-                try:
-                    attr_ids = await asyncio.wait_for(
-                        self._discover_attributes(device),
-                        timeout=DISCOVERY_TIMEOUT,
-                    )
-                except TimeoutError:
-                    _LOGGER.warning(
-                        "Attribute discovery timed out for %s, using all known",
-                        device.device_name,
-                    )
-                    attr_ids = list(ALL_READABLE_ATTRIBUTES) + self._custom_attr_ids
-                self._discovery_done[did] = True
+            catalog = self._attribute_catalog.get(did, {})
+            attr_names = [
+                f"{aid}:{catalog[aid].name}" if aid in catalog else str(aid)
+                for aid in sorted(attr_ids)
+            ]
+            _LOGGER.debug(
+                "Polling %s: %d attrs [%s]",
+                device.device_name,
+                len(attr_ids),
+                ", ".join(attr_names),
+            )
 
             try:
                 await self.api.refresh_data_wait(device, attr_ids)
@@ -132,79 +173,3 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
             result[did] = data
 
         return result
-
-    async def _discover_attributes(
-        self, device: VitotrolDevice
-    ) -> list[int]:
-        """Discover which known attributes the device supports via binary search.
-
-        Stores the result in self._supported_attrs and returns the supported list.
-        """
-        did = device.device_id
-        all_attrs = list(ALL_READABLE_ATTRIBUTES) + self._custom_attr_ids
-
-        _LOGGER.debug(
-            "Starting attribute discovery for %s with %d attributes",
-            device.device_name,
-            len(all_attrs),
-        )
-
-        # First try all at once
-        try:
-            await self.api.refresh_data_wait(device, all_attrs)
-            data = await self.api.get_data(device, all_attrs)
-            # All worked — keep whichever returned data
-            supported = [aid for aid in all_attrs if aid in data]
-            self._supported_attrs[did] = supported
-            _LOGGER.debug(
-                "All attributes accepted for %s (%d returned data)",
-                device.device_name,
-                len(supported),
-            )
-            return supported
-        except VitotrolError:
-            _LOGGER.debug(
-                "Full attribute list failed for %s, starting binary search",
-                device.device_name,
-            )
-
-        # Binary search to find supported attributes
-        supported = await self._binary_search_attrs(device, all_attrs)
-        self._supported_attrs[did] = supported
-        _LOGGER.info(
-            "Attribute discovery for %s complete: %d of %d supported",
-            device.device_name,
-            len(supported),
-            len(all_attrs),
-        )
-        return supported
-
-    async def _binary_search_attrs(
-        self, device: VitotrolDevice, attr_ids: list[int]
-    ) -> list[int]:
-        """Recursively find supported attributes by splitting and testing."""
-        if not attr_ids:
-            return []
-
-        # Single attribute — test it directly
-        if len(attr_ids) == 1:
-            try:
-                data = await self.api.get_data(device, attr_ids)
-                if attr_ids[0] in data:
-                    return attr_ids
-            except VitotrolError:
-                pass
-            return []
-
-        # Try the full list
-        try:
-            data = await self.api.get_data(device, attr_ids)
-            return [aid for aid in attr_ids if aid in data]
-        except VitotrolError:
-            pass
-
-        # Split in half and recurse
-        mid = len(attr_ids) // 2
-        left = await self._binary_search_attrs(device, attr_ids[:mid])
-        right = await self._binary_search_attrs(device, attr_ids[mid:])
-        return left + right

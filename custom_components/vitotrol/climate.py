@@ -59,8 +59,8 @@ async def async_setup_entry(
     entities: list[ClimateEntity] = []
 
     for device in coordinator.devices:
-        device_data = coordinator.data.get(device.device_id, {})
-        if ATTR_OPERATING_MODE_REQUESTED in device_data:
+        catalog = coordinator.get_attribute_catalog(device.device_id)
+        if ATTR_OPERATING_MODE_REQUESTED in catalog:
             entities.append(VitotrolClimate(coordinator, device))
 
     async_add_entities(entities)
@@ -90,6 +90,18 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
         device: VitotrolDevice,
     ) -> None:
         super().__init__(coordinator, device, "climate")
+
+    def _polling_attr_ids(self) -> set[int]:
+        """Climate reads multiple attributes."""
+        return {
+            ATTR_OPERATING_MODE_REQUESTED,
+            ATTR_OPERATING_MODE_CURRENT,
+            ATTR_INDOOR_TEMP,
+            ATTR_HEAT_NORMAL_TEMP,
+            ATTR_BURNER_STATE,
+            ATTR_ENERGY_SAVING_MODE,
+            ATTR_PARTY_MODE,
+        }
 
     @property
     def current_temperature(self) -> float | None:

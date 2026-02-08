@@ -24,13 +24,9 @@
       "init": {
         "title": "Vitotrol Options",
         "data": {
-          "scan_interval": "Scan interval (seconds)",
-          "custom_attributes": "Custom attributes (one per line or comma-separated, format: name-0xHHHH)"
+          "scan_interval": "Scan interval (seconds)"
         }
       }
-    },
-    "error": {
-      "invalid_custom_attr": "Invalid custom attribute format. Use name-0xHHHH (e.g. my_sensor-0x2637)."
     }
   },
   "entity": {

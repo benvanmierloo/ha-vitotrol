@@ -85,9 +85,9 @@ async def async_setup_entry(
     entities: list[BinarySensorEntity] = []
 
     for device in coordinator.devices:
-        device_data = coordinator.data.get(device.device_id, {})
+        catalog = coordinator.get_attribute_catalog(device.device_id)
         for desc in BINARY_SENSOR_DESCRIPTIONS:
-            if desc.attr_id in device_data:
+            if desc.attr_id in catalog:
                 entities.append(
                     VitotrolBinarySensor(coordinator, device, desc)
                 )

@@ -66,6 +66,24 @@ class VitotrolDevice:
     is_connected: bool
 
 
+@dataclass
+class AttributeTypeInfo:
+    """Metadata for a device attribute from GetTypeInfo."""
+
+    attr_id: int
+    name: str
+    type: str
+    min_value: str
+    max_value: str
+    unit: str
+    group: str
+    heating_circuit_id: str
+    factory_default: str
+    readable: bool
+    writable: bool
+    enum_values: dict[int, str] | None = None
+
+
 def _strip_ns(element: ElementTree.Element) -> None:
     """Remove XML namespace prefixes from tag names in-place."""
     element.tag = _NS_RE.sub("", element.tag)
@@ -131,6 +149,61 @@ class VitotrolAPI:
 
         _LOGGER.debug("Discovered %d device(s)", len(devices))
         return devices
+
+    async def get_type_info(
+        self, device: VitotrolDevice
+    ) -> dict[int, AttributeTypeInfo]:
+        """Get all available datapoint definitions for a device."""
+        body = (
+            "<GetTypeInfo>"
+            f"<AnlageId>{device.location_id}</AnlageId>"
+            f"<GeraetId>{device.device_id}</GeraetId>"
+            "</GetTypeInfo>"
+        )
+        root = await self._send_request("GetTypeInfo", body)
+
+        # First pass: collect base entries and enum value entries
+        base_entries: dict[int, AttributeTypeInfo] = {}
+        enum_values: dict[int, dict[int, str]] = {}
+
+        for dp in root.iter("DatenpunktTypInfo"):
+            raw_id = _find_text(dp, "DatenpunktId")
+
+            if "-" in raw_id:
+                # Enum value entry: "92-0" -> attr_id=92, index=0
+                parts = raw_id.split("-", 1)
+                attr_id = int(parts[0])
+                index = int(parts[1])
+                label = _find_text_opt(dp, "MinimalWert") or str(index)
+                enum_values.setdefault(attr_id, {})[index] = label
+                continue
+
+            attr_id = int(raw_id)
+            base_entries[attr_id] = AttributeTypeInfo(
+                attr_id=attr_id,
+                name=_find_text_opt(dp, "DatenpunktName") or "",
+                type=_find_text_opt(dp, "DatenpunktTyp") or "",
+                min_value=_find_text_opt(dp, "MinimalWert") or "",
+                max_value=_find_text_opt(dp, "MaximalWert") or "",
+                unit=_find_text_opt(dp, "EinheitBezeichnung") or "",
+                group=_find_text_opt(dp, "DatenpunktGruppe") or "",
+                heating_circuit_id=_find_text_opt(dp, "HeizkreisId") or "",
+                factory_default=_find_text_opt(dp, "Auslieferungswert") or "",
+                readable=_find_text_opt(dp, "IstLesbar") == "true",
+                writable=_find_text_opt(dp, "IstSchreibbar") == "true",
+            )
+
+        # Second pass: attach enum values to their base entries
+        for attr_id, values in enum_values.items():
+            if attr_id in base_entries:
+                base_entries[attr_id].enum_values = values
+
+        _LOGGER.debug(
+            "GetTypeInfo returned %d attributes for device %d",
+            len(base_entries),
+            device.device_id,
+        )
+        return base_entries
 
     async def get_data(
         self, device: VitotrolDevice, attr_ids: list[int]
@@ -301,13 +374,19 @@ class VitotrolAPI:
                 headers=headers,
                 timeout=_REQUEST_TIMEOUT,
             ) as resp:
-                _LOGGER.debug("SOAP %s response status: %s", soap_action, resp.status)
                 if store_cookies:
                     for cookie in resp.cookies.values():
                         self._cookies[cookie.key] = cookie.value
 
                 resp_text = await resp.text()
-                _LOGGER.debug("SOAP %s response body: %s", soap_action, resp_text[:2000])
+
+                if resp.status != 200:
+                    _LOGGER.debug(
+                        "SOAP %s HTTP %s: %s",
+                        soap_action,
+                        resp.status,
+                        resp_text[:2000],
+                    )
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.debug("SOAP %s connection error: %s", soap_action, err)
             raise VitotrolError(f"Connection error: {err}") from err

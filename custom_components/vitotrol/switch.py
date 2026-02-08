@@ -51,9 +51,9 @@ async def async_setup_entry(
     entities: list[SwitchEntity] = []
 
     for device in coordinator.devices:
-        device_data = coordinator.data.get(device.device_id, {})
+        catalog = coordinator.get_attribute_catalog(device.device_id)
         for desc in SWITCH_DESCRIPTIONS:
-            if desc.attr_id in device_data:
+            if desc.attr_id in catalog:
                 entities.append(
                     VitotrolSwitch(coordinator, device, desc)
                 )

@@ -10,6 +10,7 @@ PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.CLIMATE,
     Platform.NUMBER,
+    Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
 ]
@@ -38,11 +39,8 @@ WRITE_INITIAL_WAIT = 4
 WRITE_MIN_WAIT = 1
 WRITE_TIMEOUT = 60
 
-DISCOVERY_TIMEOUT = 120  # seconds — binary search can be slow
-
 # Config entry keys
 CONF_SCAN_INTERVAL = "scan_interval"
-CONF_CUSTOM_ATTRIBUTES = "custom_attributes"
 
 # ---------------------------------------------------------------------------
 # Attribute IDs
@@ -91,11 +89,12 @@ ATTR_WAY3_VALVE_STATUS = 5389
 ATTR_FROST_PROTECTION_STATUS = 717
 
 # ---------------------------------------------------------------------------
-# All readable attribute IDs for auto-discovery
+# Attr IDs with hardcoded entity definitions (enabled by default).
+# Dynamic entities are created for all other attrs from GetTypeInfo.
 # ---------------------------------------------------------------------------
 
-ALL_READABLE_ATTRIBUTES: list[int] = [
-    # Temperatures
+KNOWN_ATTR_IDS: frozenset[int] = frozenset({
+    # Sensors
     ATTR_INDOOR_TEMP,
     ATTR_OUTDOOR_TEMP,
     ATTR_SMOKE_TEMP,
@@ -103,31 +102,29 @@ ALL_READABLE_ATTRIBUTES: list[int] = [
     ATTR_HOT_WATER_TEMP,
     ATTR_HOT_WATER_OUT_TEMP,
     ATTR_HEAT_WATER_OUT_TEMP,
-    # Setpoints (readable too)
-    ATTR_HEAT_NORMAL_TEMP,
-    ATTR_PARTY_MODE_TEMP,
-    ATTR_HEAT_REDUCED_TEMP,
-    ATTR_HOT_WATER_SETPOINT_TEMP,
-    # Counters
     ATTR_BURNER_HOURS_RUN,
     ATTR_BURNER_STARTS,
-    # Status
+    ATTR_OPERATING_MODE_CURRENT,
+    ATTR_WAY3_VALVE_STATUS,
+    ATTR_CURRENT_ERROR,
+    # Binary sensors
     ATTR_BURNER_STATE,
     ATTR_INTERNAL_PUMP_STATUS,
     ATTR_HEATING_PUMP_STATUS,
     ATTR_CIRCULATION_PUMP_STATE,
-    # Operating mode
+    ATTR_FROST_PROTECTION_STATUS,
+    ATTR_HOLIDAYS_STATUS,
+    # Climate (operating mode + target temp)
     ATTR_OPERATING_MODE_REQUESTED,
-    ATTR_OPERATING_MODE_CURRENT,
+    ATTR_HEAT_NORMAL_TEMP,
     # Switches
     ATTR_PARTY_MODE,
     ATTR_ENERGY_SAVING_MODE,
-    # Other
-    ATTR_CURRENT_ERROR,
-    ATTR_HOLIDAYS_STATUS,
-    ATTR_WAY3_VALVE_STATUS,
-    ATTR_FROST_PROTECTION_STATUS,
-]
+    # Numbers
+    ATTR_HOT_WATER_SETPOINT_TEMP,
+    ATTR_HEAT_REDUCED_TEMP,
+    ATTR_PARTY_MODE_TEMP,
+})
 
 # ---------------------------------------------------------------------------
 # Enum value mappings

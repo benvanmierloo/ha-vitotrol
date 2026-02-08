@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -11,12 +10,12 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import EntityCategory, UnitOfTemperature, UnitOfTime
+from homeassistant.const import UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import VitotrolConfigEntry
-from .api import VitotrolDevice
+from .api import AttributeTypeInfo, VitotrolDevice
 from .const import (
     ATTR_BOILER_TEMP,
     ATTR_BURNER_HOURS_RUN,
@@ -30,12 +29,18 @@ from .const import (
     ATTR_OUTDOOR_TEMP,
     ATTR_SMOKE_TEMP,
     ATTR_WAY3_VALVE_STATUS,
-    CONF_CUSTOM_ATTRIBUTES,
+    KNOWN_ATTR_IDS,
     OPERATING_MODE_CURRENT_MAP,
     WAY3_VALVE_STATUS_MAP,
 )
 from .coordinator import VitotrolCoordinator
 from .entity import VitotrolEntity
+
+# Unit string -> (SensorDeviceClass, HA unit constant, SensorStateClass)
+_UNIT_MAP: dict[str, tuple[SensorDeviceClass, str, SensorStateClass | None]] = {
+    "°C": (SensorDeviceClass.TEMPERATURE, UnitOfTemperature.CELSIUS, SensorStateClass.MEASUREMENT),
+    "h": (SensorDeviceClass.DURATION, UnitOfTime.HOURS, SensorStateClass.TOTAL_INCREASING),
+}
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -137,7 +142,6 @@ SENSOR_DESCRIPTIONS: tuple[VitotrolSensorEntityDescription, ...] = (
         key="current_error",
         translation_key="current_error",
         attr_id=ATTR_CURRENT_ERROR,
-        entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )
 
@@ -153,23 +157,72 @@ async def async_setup_entry(
     entities: list[SensorEntity] = []
 
     for device in coordinator.devices:
-        device_data = coordinator.data.get(device.device_id, {})
+        catalog = coordinator.get_attribute_catalog(device.device_id)
 
+        # Known sensors (enabled by default)
         for desc in SENSOR_DESCRIPTIONS:
-            if desc.attr_id in device_data:
+            if desc.attr_id in catalog:
                 entities.append(
                     VitotrolSensor(coordinator, device, desc)
                 )
 
-        # Custom attribute sensors
-        for custom in entry.options.get(CONF_CUSTOM_ATTRIBUTES, []):
-            attr_id = custom["attr_id"]
-            if attr_id in device_data:
-                entities.append(
-                    VitotrolCustomSensor(coordinator, device, custom)
-                )
+        # Dynamic sensors for discovered read-only attributes
+        for attr_id, info in catalog.items():
+            if attr_id in KNOWN_ATTR_IDS:
+                continue
+            if not info.readable:
+                continue
+            if info.writable:
+                # Writable attrs are handled by number/select platforms
+                continue
+
+            entities.append(
+                _create_dynamic_sensor(coordinator, device, info)
+            )
 
     async_add_entities(entities)
+
+
+def _create_dynamic_sensor(
+    coordinator: VitotrolCoordinator,
+    device: VitotrolDevice,
+    info: AttributeTypeInfo,
+) -> VitotrolDynamicSensor:
+    """Create a dynamic sensor entity from GetTypeInfo metadata."""
+    if info.enum_values is not None:
+        # Enum sensor
+        enum_map = {str(k): v for k, v in info.enum_values.items()}
+        return VitotrolDynamicSensor(
+            coordinator,
+            device,
+            info,
+            device_class=SensorDeviceClass.ENUM,
+            options=list(enum_map.values()),
+            enum_values=enum_map,
+            unit=None,
+            state_class=None,
+        )
+
+    # Numeric or string sensor
+    device_class = None
+    unit = info.unit or None
+    state_class: SensorStateClass | None = SensorStateClass.MEASUREMENT
+
+    if info.unit in _UNIT_MAP:
+        device_class, unit, state_class = _UNIT_MAP[info.unit]
+    elif not info.unit:
+        state_class = None
+
+    return VitotrolDynamicSensor(
+        coordinator,
+        device,
+        info,
+        device_class=device_class,
+        options=None,
+        enum_values=None,
+        unit=unit,
+        state_class=state_class,
+    )
 
 
 class VitotrolSensor(VitotrolEntity, SensorEntity):
@@ -214,20 +267,31 @@ class VitotrolSensor(VitotrolEntity, SensorEntity):
         return raw
 
 
-class VitotrolCustomSensor(VitotrolEntity, SensorEntity):
-    """Sensor entity for a user-defined custom attribute."""
+class VitotrolDynamicSensor(VitotrolEntity, SensorEntity):
+    """Sensor entity for a dynamically discovered attribute."""
+
+    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self,
         coordinator: VitotrolCoordinator,
         device: VitotrolDevice,
-        custom: dict[str, Any],
+        info: AttributeTypeInfo,
+        *,
+        device_class: SensorDeviceClass | None,
+        options: list[str] | None,
+        enum_values: dict[str, str] | None,
+        unit: str | None,
+        state_class: SensorStateClass | None,
     ) -> None:
-        attr_id = custom["attr_id"]
-        key = f"custom_{attr_id:04x}"
-        super().__init__(coordinator, device, key)
-        self._attr_id = attr_id
-        self._attr_name = custom["name"].replace("_", " ").title()
+        super().__init__(coordinator, device, f"attr_{info.attr_id}")
+        self._attr_id = info.attr_id
+        self._attr_name = info.name
+        self._attr_device_class = device_class
+        self._attr_native_unit_of_measurement = unit
+        self._attr_state_class = state_class
+        self._attr_options = options
+        self._enum_values = enum_values
 
     @property
     def available(self) -> bool:
@@ -236,11 +300,18 @@ class VitotrolCustomSensor(VitotrolEntity, SensorEntity):
 
     @property
     def native_value(self) -> float | str | None:
-        """Return the sensor value, attempting float conversion."""
+        """Return the sensor value."""
         raw = self._get_attr_value(self._attr_id)
         if raw is None:
             return None
-        try:
-            return float(raw)
-        except ValueError:
-            return raw
+
+        if self._enum_values is not None:
+            return self._enum_values.get(raw, raw)
+
+        if self._attr_state_class is not None:
+            try:
+                return float(raw)
+            except ValueError:
+                return None
+
+        return raw

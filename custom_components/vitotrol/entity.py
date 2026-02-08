@@ -35,6 +35,41 @@ class VitotrolEntity(CoordinatorEntity[VitotrolCoordinator]):
             ),
         )
 
+    # ------------------------------------------------------------------
+    # Lifecycle — register/unregister attr_ids for polling
+    # ------------------------------------------------------------------
+
+    async def async_added_to_hass(self) -> None:
+        """Register attr_ids with the coordinator when entity is added."""
+        await super().async_added_to_hass()
+        attr_ids = self._polling_attr_ids()
+        if attr_ids:
+            self.coordinator.register_entity_attrs(
+                self._device_id, self._attr_unique_id, attr_ids
+            )
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unregister attr_ids when entity is removed."""
+        self.coordinator.unregister_entity_attrs(
+            self._device_id, self._attr_unique_id
+        )
+        await super().async_will_remove_from_hass()
+
+    def _polling_attr_ids(self) -> set[int]:
+        """Return the set of attr_ids this entity needs polled.
+
+        Default: uses self._attr_id if present. Override in entities
+        that read multiple attributes (e.g. climate).
+        """
+        attr_id = getattr(self, "_attr_id", None)
+        if attr_id is not None:
+            return {attr_id}
+        return set()
+
+    # ------------------------------------------------------------------
+    # Data access helpers
+    # ------------------------------------------------------------------
+
     @property
     def _device_data(self) -> dict[int, str]:
         """Return the data dict for this entity's device."""

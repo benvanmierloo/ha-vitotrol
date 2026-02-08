@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any
 
 import aiohttp
@@ -18,11 +17,9 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.selector import TextSelector, TextSelectorConfig
 
 from .api import VitotrolAPI, VitotrolAuthError, VitotrolError
 from .const import (
-    CONF_CUSTOM_ATTRIBUTES,
     CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -31,8 +28,6 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-_CUSTOM_ATTR_RE = re.compile(r"^(.+)-0x([0-9a-fA-F]{1,4})$")
 
 USER_SCHEMA = vol.Schema(
     {
@@ -106,46 +101,15 @@ class VitotrolOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Manage scan interval and custom attributes."""
-        errors: dict[str, str] = {}
-
+        """Manage scan interval."""
         if user_input is not None:
-            # Parse custom attributes
-            custom_attrs: list[dict[str, Any]] = []
-            raw_attrs = user_input.get(CONF_CUSTOM_ATTRIBUTES, "").strip()
+            return self.async_create_entry(
+                title="",
+                data={CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL]},
+            )
 
-            if raw_attrs:
-                # Support both newlines and commas as separators
-                entries = re.split(r"[,\n]+", raw_attrs)
-                for line in entries:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    match = _CUSTOM_ATTR_RE.match(line)
-                    if not match:
-                        errors[CONF_CUSTOM_ATTRIBUTES] = "invalid_custom_attr"
-                        break
-                    name = match.group(1)
-                    attr_id = int(match.group(2), 16)
-                    custom_attrs.append({"name": name, "attr_id": attr_id})
-
-            if not errors:
-                return self.async_create_entry(
-                    title="",
-                    data={
-                        CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
-                        CONF_CUSTOM_ATTRIBUTES: custom_attrs,
-                    },
-                )
-
-        current_options = self._config_entry.options
-        current_interval = current_options.get(
+        current_interval = self._config_entry.options.get(
             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-        )
-        # Rebuild the text area content from stored custom attributes
-        current_custom = current_options.get(CONF_CUSTOM_ATTRIBUTES, [])
-        custom_text = "\n".join(
-            f"{c['name']}-0x{c['attr_id']:04X}" for c in current_custom
         )
 
         return self.async_show_form(
@@ -158,10 +122,6 @@ class VitotrolOptionsFlow(OptionsFlow):
                         int,
                         vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL),
                     ),
-                    vol.Optional(
-                        CONF_CUSTOM_ATTRIBUTES, default=custom_text
-                    ): TextSelector(TextSelectorConfig(multiline=True)),
                 }
             ),
-            errors=errors,
         )

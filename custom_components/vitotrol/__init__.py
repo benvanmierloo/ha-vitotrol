@@ -12,7 +12,6 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import VitotrolAPI, VitotrolError
 from .const import (
-    CONF_CUSTOM_ATTRIBUTES,
     CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -55,14 +54,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: VitotrolConfigEntry) -> 
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = VitotrolCoordinator(hass, api, devices, scan_interval)
 
-    # Apply custom attributes from options
-    _apply_custom_attrs(coordinator, entry)
-
-    await coordinator.async_config_entry_first_refresh()
+    # Discover all device attributes via GetTypeInfo
+    try:
+        await coordinator.async_setup_type_info()
+    except VitotrolError as err:
+        raise ConfigEntryNotReady(
+            f"Failed to discover device attributes: {err}"
+        ) from err
 
     entry.runtime_data = VitotrolRuntimeData(api=api, coordinator=coordinator)
 
+    # Forward to platforms FIRST so entities register their attr_ids,
+    # then refresh with the correct poll set.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    await coordinator.async_config_entry_first_refresh()
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
@@ -81,12 +87,3 @@ async def _async_options_updated(
 ) -> None:
     """Handle options update — reload the integration."""
     await hass.config_entries.async_reload(entry.entry_id)
-
-
-def _apply_custom_attrs(
-    coordinator: VitotrolCoordinator, entry: ConfigEntry
-) -> None:
-    """Set custom attribute IDs on the coordinator from entry options."""
-    custom_list = entry.options.get(CONF_CUSTOM_ATTRIBUTES, [])
-    attr_ids = [c["attr_id"] for c in custom_list if "attr_id" in c]
-    coordinator.set_custom_attr_ids(attr_ids)
