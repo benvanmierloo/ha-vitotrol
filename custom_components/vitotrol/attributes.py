@@ -161,7 +161,7 @@ _TABLE: list[tuple[int, str, bool, str]] = [
     (12526, "Fuel cell maintenance status",      False,  "enum"),
 
     # ---- Other sensors ------------------------------------------------------
-    (7184,  "Current error",                     True,   "text"),
+    (7184,  "Current error",                     True,   "diag"),
     (897,   "Error byte",                        False,  "diag"),
 
     # ---- Binary sensors (see _ON_VALUES for non-default) --------------------
