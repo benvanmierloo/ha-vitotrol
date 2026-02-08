@@ -9,7 +9,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import AttributeTypeInfo, VitotrolAPI, VitotrolAuthError, VitotrolDevice, VitotrolError
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, KNOWN_ATTR_IDS
+from .attributes import ATTRIBUTE_REGISTRY
+from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,8 +81,8 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
     def _get_attr_ids(self, device_id: int) -> list[int]:
         """Return attr_ids to poll: union of all registered entity needs.
 
-        Before entity setup (first refresh), falls back to KNOWN_ATTR_IDS
-        that the device actually supports.
+        Before entity setup (first refresh), falls back to enabled-by-default
+        registry entries that the device actually supports.
         """
         device_entities = self._entity_attr_ids.get(device_id, {})
         if device_entities:
@@ -94,8 +95,10 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
         catalog = self._attribute_catalog.get(device_id, {})
         return [
             attr_id
-            for attr_id in KNOWN_ATTR_IDS
-            if attr_id in catalog and catalog[attr_id].readable
+            for attr_id, meta in ATTRIBUTE_REGISTRY.items()
+            if meta.enabled_by_default
+            and attr_id in catalog
+            and catalog[attr_id].readable
         ]
 
     # ------------------------------------------------------------------

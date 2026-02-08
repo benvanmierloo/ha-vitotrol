@@ -2,42 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
-from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
-from homeassistant.const import EntityCategory
+from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import VitotrolConfigEntry
-from .api import VitotrolDevice
-from .const import ATTR_ENERGY_SAVING_MODE, ATTR_PARTY_MODE
+from .api import AttributeTypeInfo, VitotrolDevice
+from .attributes import ATTRIBUTE_REGISTRY, AttrMeta
 from .coordinator import VitotrolCoordinator
 from .entity import VitotrolEntity
-
-
-@dataclass(frozen=True, kw_only=True)
-class VitotrolSwitchEntityDescription(SwitchEntityDescription):
-    """Describes a Vitotrol switch entity."""
-
-    attr_id: int
-
-
-SWITCH_DESCRIPTIONS: tuple[VitotrolSwitchEntityDescription, ...] = (
-    VitotrolSwitchEntityDescription(
-        key="party_mode",
-        translation_key="party_mode",
-        attr_id=ATTR_PARTY_MODE,
-        entity_category=EntityCategory.CONFIG,
-    ),
-    VitotrolSwitchEntityDescription(
-        key="energy_saving_mode",
-        translation_key="energy_saving_mode",
-        attr_id=ATTR_ENERGY_SAVING_MODE,
-        entity_category=EntityCategory.CONFIG,
-    ),
-)
 
 
 async def async_setup_entry(
@@ -52,11 +27,12 @@ async def async_setup_entry(
 
     for device in coordinator.devices:
         catalog = coordinator.get_attribute_catalog(device.device_id)
-        for desc in SWITCH_DESCRIPTIONS:
-            if desc.attr_id in catalog:
-                entities.append(
-                    VitotrolSwitch(coordinator, device, desc)
-                )
+
+        for attr_id, info in catalog.items():
+            meta = ATTRIBUTE_REGISTRY.get(attr_id)
+            if meta is None or meta.platform != "switch":
+                continue
+            entities.append(VitotrolSwitch(coordinator, device, info, meta))
 
     async_add_entities(entities)
 
@@ -64,27 +40,28 @@ async def async_setup_entry(
 class VitotrolSwitch(VitotrolEntity, SwitchEntity):
     """Switch entity for a Vitotrol on/off attribute."""
 
-    entity_description: VitotrolSwitchEntityDescription
-
     def __init__(
         self,
         coordinator: VitotrolCoordinator,
         device: VitotrolDevice,
-        description: VitotrolSwitchEntityDescription,
+        info: AttributeTypeInfo,
+        meta: AttrMeta,
     ) -> None:
-        super().__init__(coordinator, device, description.key)
-        self.entity_description = description
-        self._attr_id = description.attr_id
+        key = meta.name.lower().replace(" ", "_")
+        super().__init__(coordinator, device, key)
+        self._vitotrol_attr_id = info.attr_id
+        self._attr_name = meta.name
+        self._attr_entity_registry_enabled_default = meta.enabled_by_default
 
     @property
     def available(self) -> bool:
         """Return True if the attribute is present in the data."""
-        return super().available and self._attr_id in self._device_data
+        return super().available and self._vitotrol_attr_id in self._device_data
 
     @property
     def is_on(self) -> bool | None:
         """Return True if the switch is on."""
-        raw = self._get_attr_value(self._attr_id)
+        raw = self._get_attr_value(self._vitotrol_attr_id)
         if raw is None:
             return None
         return raw == "1"
@@ -92,15 +69,15 @@ class VitotrolSwitch(VitotrolEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the switch."""
         await self.coordinator.async_write(
-            self._device, self._attr_id, "1"
+            self._device, self._vitotrol_attr_id, "1"
         )
-        self._update_coordinator_data(self._attr_id, "1")
+        self._update_coordinator_data(self._vitotrol_attr_id, "1")
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the switch."""
         await self.coordinator.async_write(
-            self._device, self._attr_id, "0"
+            self._device, self._vitotrol_attr_id, "0"
         )
-        self._update_coordinator_data(self._attr_id, "0")
+        self._update_coordinator_data(self._vitotrol_attr_id, "0")
         self.async_write_ha_state()

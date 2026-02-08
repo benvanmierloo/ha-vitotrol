@@ -58,10 +58,10 @@ class VitotrolEntity(CoordinatorEntity[VitotrolCoordinator]):
     def _polling_attr_ids(self) -> set[int]:
         """Return the set of attr_ids this entity needs polled.
 
-        Default: uses self._attr_id if present. Override in entities
-        that read multiple attributes (e.g. climate).
+        Default: uses self._vitotrol_attr_id if present. Override in
+        entities that read multiple attributes (e.g. climate).
         """
-        attr_id = getattr(self, "_attr_id", None)
+        attr_id = getattr(self, "_vitotrol_attr_id", None)
         if attr_id is not None:
             return {attr_id}
         return set()

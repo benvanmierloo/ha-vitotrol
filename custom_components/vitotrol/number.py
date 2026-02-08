@@ -2,75 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from homeassistant.components.number import (
-    NumberDeviceClass,
-    NumberEntity,
-    NumberEntityDescription,
-    NumberMode,
-)
-from homeassistant.const import EntityCategory, UnitOfTemperature
+from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
+from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import VitotrolConfigEntry
 from .api import AttributeTypeInfo, VitotrolDevice
-from .const import (
-    ATTR_HEAT_REDUCED_TEMP,
-    ATTR_HOT_WATER_SETPOINT_TEMP,
-    ATTR_PARTY_MODE_TEMP,
-    KNOWN_ATTR_IDS,
-)
+from .attributes import ATTRIBUTE_REGISTRY, AttrMeta
 from .coordinator import VitotrolCoordinator
 from .entity import VitotrolEntity
-
-
-@dataclass(frozen=True, kw_only=True)
-class VitotrolNumberEntityDescription(NumberEntityDescription):
-    """Describes a Vitotrol number entity."""
-
-    attr_id: int
-
-
-NUMBER_DESCRIPTIONS: tuple[VitotrolNumberEntityDescription, ...] = (
-    VitotrolNumberEntityDescription(
-        key="hot_water_setpoint",
-        translation_key="hot_water_setpoint",
-        attr_id=ATTR_HOT_WATER_SETPOINT_TEMP,
-        device_class=NumberDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        native_min_value=10.0,
-        native_max_value=60.0,
-        native_step=1.0,
-        mode=NumberMode.BOX,
-        entity_category=EntityCategory.CONFIG,
-    ),
-    VitotrolNumberEntityDescription(
-        key="reduced_temperature_setpoint",
-        translation_key="reduced_temperature_setpoint",
-        attr_id=ATTR_HEAT_REDUCED_TEMP,
-        device_class=NumberDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        native_min_value=3.0,
-        native_max_value=30.0,
-        native_step=0.5,
-        mode=NumberMode.BOX,
-        entity_category=EntityCategory.CONFIG,
-    ),
-    VitotrolNumberEntityDescription(
-        key="party_mode_temperature",
-        translation_key="party_mode_temperature",
-        attr_id=ATTR_PARTY_MODE_TEMP,
-        device_class=NumberDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        native_min_value=10.0,
-        native_max_value=30.0,
-        native_step=0.5,
-        mode=NumberMode.BOX,
-        entity_category=EntityCategory.CONFIG,
-    ),
-)
 
 
 async def async_setup_entry(
@@ -86,74 +27,27 @@ async def async_setup_entry(
     for device in coordinator.devices:
         catalog = coordinator.get_attribute_catalog(device.device_id)
 
-        # Known number entities (enabled by default)
-        for desc in NUMBER_DESCRIPTIONS:
-            if desc.attr_id in catalog:
-                entities.append(
-                    VitotrolNumber(coordinator, device, desc)
-                )
-
-        # Dynamic numbers for discovered writable non-enum attributes
         for attr_id, info in catalog.items():
-            if attr_id in KNOWN_ATTR_IDS:
-                continue
-            if not info.writable or not info.readable:
-                continue
-            if info.enum_values is not None:
-                # Writable enums are handled by the select platform
-                continue
+            meta = ATTRIBUTE_REGISTRY.get(attr_id)
 
-            entities.append(
-                VitotrolDynamicNumber(coordinator, device, info)
-            )
+            if meta is not None:
+                if meta.platform != "number":
+                    continue
+                entities.append(VitotrolNumber(coordinator, device, info, meta))
+            else:
+                # Unknown attr: auto-route RW numeric non-enum to number
+                if not info.writable or not info.readable:
+                    continue
+                if info.enum_values is not None:
+                    continue
+                entities.append(VitotrolNumber(coordinator, device, info, meta=None))
 
     async_add_entities(entities)
 
 
 class VitotrolNumber(VitotrolEntity, NumberEntity):
-    """Number entity for a writable Vitotrol temperature setpoint."""
+    """Number entity for a writable Vitotrol attribute."""
 
-    entity_description: VitotrolNumberEntityDescription
-
-    def __init__(
-        self,
-        coordinator: VitotrolCoordinator,
-        device: VitotrolDevice,
-        description: VitotrolNumberEntityDescription,
-    ) -> None:
-        super().__init__(coordinator, device, description.key)
-        self.entity_description = description
-        self._attr_id = description.attr_id
-
-    @property
-    def available(self) -> bool:
-        """Return True if the attribute is present in the data."""
-        return super().available and self._attr_id in self._device_data
-
-    @property
-    def native_value(self) -> float | None:
-        """Return the current value."""
-        raw = self._get_attr_value(self._attr_id)
-        if raw is None:
-            return None
-        try:
-            return float(raw)
-        except ValueError:
-            return None
-
-    async def async_set_native_value(self, value: float) -> None:
-        """Set a new value."""
-        await self.coordinator.async_write(
-            self._device, self._attr_id, str(value)
-        )
-        self._update_coordinator_data(self._attr_id, str(value))
-        self.async_write_ha_state()
-
-
-class VitotrolDynamicNumber(VitotrolEntity, NumberEntity):
-    """Number entity for a dynamically discovered writable attribute."""
-
-    _attr_entity_registry_enabled_default = False
     _attr_mode = NumberMode.BOX
 
     def __init__(
@@ -161,12 +55,28 @@ class VitotrolDynamicNumber(VitotrolEntity, NumberEntity):
         coordinator: VitotrolCoordinator,
         device: VitotrolDevice,
         info: AttributeTypeInfo,
+        meta: AttrMeta | None,
     ) -> None:
-        super().__init__(coordinator, device, f"attr_{info.attr_id}")
-        self._attr_id = info.attr_id
-        self._attr_name = info.name
+        key = meta.name.lower().replace(" ", "_") if meta else f"attr_{info.attr_id}"
+        super().__init__(coordinator, device, key)
+        self._vitotrol_attr_id = info.attr_id
 
-        # Use min/max from API metadata
+        if meta is not None:
+            self._attr_name = meta.name
+            self._attr_entity_registry_enabled_default = meta.enabled_by_default
+            self._attr_native_unit_of_measurement = meta.unit
+            self._attr_device_class = meta.device_class
+            self._attr_entity_category = meta.entity_category
+        else:
+            self._attr_name = info.name
+            self._attr_entity_registry_enabled_default = False
+            if info.unit == "\u00b0C":
+                self._attr_device_class = NumberDeviceClass.TEMPERATURE
+                self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+            elif info.unit:
+                self._attr_native_unit_of_measurement = info.unit
+
+        # Min/max from API metadata
         try:
             self._attr_native_min_value = float(info.min_value)
         except (ValueError, TypeError):
@@ -176,23 +86,21 @@ class VitotrolDynamicNumber(VitotrolEntity, NumberEntity):
         except (ValueError, TypeError):
             pass
 
-        # Infer device class from unit
-        if info.unit == "°C":
-            self._attr_device_class = NumberDeviceClass.TEMPERATURE
-            self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+        # Step: 0.5 for temperature, 1.0 otherwise
+        if self._attr_device_class == NumberDeviceClass.TEMPERATURE:
             self._attr_native_step = 0.5
-        elif info.unit:
-            self._attr_native_unit_of_measurement = info.unit
+        else:
+            self._attr_native_step = 1.0
 
     @property
     def available(self) -> bool:
         """Return True if the attribute is present in the data."""
-        return super().available and self._attr_id in self._device_data
+        return super().available and self._vitotrol_attr_id in self._device_data
 
     @property
     def native_value(self) -> float | None:
         """Return the current value."""
-        raw = self._get_attr_value(self._attr_id)
+        raw = self._get_attr_value(self._vitotrol_attr_id)
         if raw is None:
             return None
         try:
@@ -203,7 +111,7 @@ class VitotrolDynamicNumber(VitotrolEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set a new value."""
         await self.coordinator.async_write(
-            self._device, self._attr_id, str(value)
+            self._device, self._vitotrol_attr_id, str(value)
         )
-        self._update_coordinator_data(self._attr_id, str(value))
+        self._update_coordinator_data(self._vitotrol_attr_id, str(value))
         self.async_write_ha_state()
