@@ -6,7 +6,7 @@
 [![GitHub Issues](https://img.shields.io/github/issues/benvanmierloo/ha-vitotrol)](https://github.com/benvanmierloo/ha-vitotrol/issues)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-donate-yellow.svg)](https://buymeacoffee.com/benvanmierloo)
 
-A Home Assistant custom integration for **Viessmann heating systems** that use the Vitotrol mobile app. Connects directly to the Viessmann cloud API — no MQTT broker, no extra hardware needed.
+A Home Assistant custom integration for **Viessmann heating systems** that use the Vitotrol mobile app. Connects directly to the Viessmann cloud API.
 
 ## What you get
 
