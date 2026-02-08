@@ -1,0 +1,374 @@
+"""Async SOAP client for the Viessmann Vitotrol API.
+
+This module has no Home Assistant dependencies — it relies only on aiohttp
+and the Python standard library so it can be tested in isolation.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import re
+from dataclasses import dataclass
+from xml.etree import ElementTree
+
+import aiohttp
+from defusedxml.ElementTree import fromstring as _safe_xml_fromstring
+
+from .const import (
+    API_ENDPOINT,
+    API_NAMESPACE,
+    APP_ID,
+    APP_OS,
+    APP_VERSION,
+    REFRESH_INITIAL_WAIT,
+    REFRESH_MIN_WAIT,
+    REFRESH_TIMEOUT,
+    WRITE_INITIAL_WAIT,
+    WRITE_MIN_WAIT,
+    WRITE_TIMEOUT,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+_NS_RE = re.compile(r"\{[^}]+\}")
+
+_REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30)
+
+_SOAP_ENVELOPE = (
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
+    ' xmlns:xsd="http://www.w3.org/2001/XMLSchema"'
+    ' xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"'
+    f' xmlns="{API_NAMESPACE}">'
+    "<soap:Body>{body}</soap:Body>"
+    "</soap:Envelope>"
+)
+
+
+class VitotrolError(Exception):
+    """General Vitotrol API error."""
+
+
+class VitotrolAuthError(VitotrolError):
+    """Authentication failure."""
+
+
+@dataclass
+class VitotrolDevice:
+    """Represents a Viessmann device discovered via GetDevices."""
+
+    location_id: int
+    location_name: str
+    device_id: int
+    device_name: str
+    has_error: bool
+    is_connected: bool
+
+
+def _strip_ns(element: ElementTree.Element) -> None:
+    """Remove XML namespace prefixes from tag names in-place."""
+    element.tag = _NS_RE.sub("", element.tag)
+    for child in element:
+        _strip_ns(child)
+
+
+class VitotrolAPI:
+    """Async client for the Viessmann Vitotrol SOAP API."""
+
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        session: aiohttp.ClientSession,
+    ) -> None:
+        self._username = username
+        self._password = password
+        self._session = session
+        self._cookies: dict[str, str] = {}
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    async def login(self) -> None:
+        """Authenticate and store the session cookie."""
+        body = (
+            "<Login>"
+            f"<AppId>{APP_ID}</AppId>"
+            f"<AppVersion>{APP_VERSION}</AppVersion>"
+            f"<Betriebssystem>{APP_OS}</Betriebssystem>"
+            f"<Benutzer>{_xml_escape(self._username)}</Benutzer>"
+            f"<Kennwort>{_xml_escape(self._password)}</Kennwort>"
+            "</Login>"
+        )
+        await self._send_request("Login", body, store_cookies=True)
+        _LOGGER.debug("Login successful")
+
+    async def get_devices(self) -> list[VitotrolDevice]:
+        """Discover all locations and devices under the account."""
+        body = "<GetDevices />"
+        root = await self._send_request("GetDevices", body)
+
+        devices: list[VitotrolDevice] = []
+        for anlage in root.iter("AnlageV2"):
+            location_id = int(_find_text(anlage, "AnlageId"))
+            location_name = _find_text(anlage, "AnlageName")
+            for geraet in anlage.iter("GeraetV2"):
+                devices.append(
+                    VitotrolDevice(
+                        location_id=location_id,
+                        location_name=location_name,
+                        device_id=int(_find_text(geraet, "GeraetId")),
+                        device_name=_find_text(geraet, "GeraetName"),
+                        has_error=_find_text(geraet, "HatFehler") == "true",
+                        is_connected=_find_text(geraet, "IstVerbunden") == "true",
+                    )
+                )
+
+        if not devices:
+            raise VitotrolError("No devices found under account")
+
+        _LOGGER.debug("Discovered %d device(s)", len(devices))
+        return devices
+
+    async def get_data(
+        self, device: VitotrolDevice, attr_ids: list[int]
+    ) -> dict[int, str]:
+        """Read cached attribute values from the server."""
+        dp_list = "".join(
+            f"<int>{attr_id}</int>" for attr_id in attr_ids
+        )
+        body = (
+            "<GetData>"
+            f"<UseCache>false</UseCache>"
+            f"<GeraetId>{device.device_id}</GeraetId>"
+            f"<AnlageId>{device.location_id}</AnlageId>"
+            f"<DatenpunktIds>{dp_list}</DatenpunktIds>"
+            "</GetData>"
+        )
+        root = await self._send_request("GetData", body)
+
+        data: dict[int, str] = {}
+        for dp in root.iter("DatenpunktValueV2"):
+            attr_id = int(_find_text(dp, "DatenpunktId"))
+            value = _find_text(dp, "Wert")
+            data[attr_id] = value
+
+        return data
+
+    async def refresh_data(
+        self, device: VitotrolDevice, attr_ids: list[int]
+    ) -> str:
+        """Tell the device to upload fresh data. Returns a refresh ID."""
+        dp_list = "".join(
+            f"<int>{attr_id}</int>" for attr_id in attr_ids
+        )
+        body = (
+            "<RefreshData>"
+            f"<GeraetId>{device.device_id}</GeraetId>"
+            f"<AnlageId>{device.location_id}</AnlageId>"
+            f"<DatenpunktIds>{dp_list}</DatenpunktIds>"
+            "</RefreshData>"
+        )
+        root = await self._send_request("RefreshData", body)
+        refresh_id = _find_text(root, "AktualisierungsId")
+        _LOGGER.debug("RefreshData started, id=%s", refresh_id)
+        return refresh_id
+
+    async def request_refresh_status(self, refresh_id: str) -> int:
+        """Poll whether a RefreshData request has completed.
+
+        Returns 0 while pending, non-zero when done.
+        """
+        body = (
+            "<RequestRefreshStatus>"
+            f"<AktualisierungsId>{_xml_escape(refresh_id)}</AktualisierungsId>"
+            "</RequestRefreshStatus>"
+        )
+        root = await self._send_request("RequestRefreshStatus", body)
+        status = int(_find_text(root, "Status"))
+        return status
+
+    async def refresh_data_wait(
+        self, device: VitotrolDevice, attr_ids: list[int]
+    ) -> None:
+        """Fire RefreshData and poll until complete or timeout."""
+        refresh_id = await self.refresh_data(device, attr_ids)
+
+        await asyncio.sleep(REFRESH_INITIAL_WAIT)
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + REFRESH_TIMEOUT
+        while True:
+            status = await self.request_refresh_status(refresh_id)
+            if status != 0:
+                _LOGGER.debug("RefreshData complete, status=%d", status)
+                return
+
+            if loop.time() >= deadline:
+                raise VitotrolError(
+                    f"RefreshData timed out after {REFRESH_TIMEOUT}s"
+                )
+
+            await asyncio.sleep(REFRESH_MIN_WAIT)
+
+    async def write_data(
+        self, device: VitotrolDevice, attr_id: int, value: str
+    ) -> str:
+        """Write a value to the device. Returns a refresh ID."""
+        body = (
+            "<WriteData>"
+            f"<GeraetId>{device.device_id}</GeraetId>"
+            f"<AnlageId>{device.location_id}</AnlageId>"
+            f"<DatenpunktId>{attr_id}</DatenpunktId>"
+            f"<Wert>{_xml_escape(value)}</Wert>"
+            "</WriteData>"
+        )
+        root = await self._send_request("WriteData", body)
+        refresh_id = _find_text(root, "AktualisierungsId")
+        _LOGGER.debug(
+            "WriteData started, attr=%d value=%s id=%s",
+            attr_id,
+            value,
+            refresh_id,
+        )
+        return refresh_id
+
+    async def request_write_status(self, refresh_id: str) -> int:
+        """Poll whether a WriteData request has completed.
+
+        Returns 0 while pending, non-zero when done.
+        """
+        body = (
+            "<RequestWriteStatus>"
+            f"<AktualisierungsId>{_xml_escape(refresh_id)}</AktualisierungsId>"
+            "</RequestWriteStatus>"
+        )
+        root = await self._send_request("RequestWriteStatus", body)
+        status = int(_find_text(root, "Status"))
+        return status
+
+    async def write_data_wait(
+        self, device: VitotrolDevice, attr_id: int, value: str
+    ) -> None:
+        """Fire WriteData and poll until complete or timeout."""
+        refresh_id = await self.write_data(device, attr_id, value)
+
+        await asyncio.sleep(WRITE_INITIAL_WAIT)
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + WRITE_TIMEOUT
+        while True:
+            status = await self.request_write_status(refresh_id)
+            if status != 0:
+                _LOGGER.debug("WriteData complete, status=%d", status)
+                return
+
+            if loop.time() >= deadline:
+                raise VitotrolError(
+                    f"WriteData timed out after {WRITE_TIMEOUT}s"
+                )
+
+            await asyncio.sleep(WRITE_MIN_WAIT)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    async def _send_request(
+        self,
+        soap_action: str,
+        body: str,
+        *,
+        store_cookies: bool = False,
+    ) -> ElementTree.Element:
+        """Build SOAP envelope, POST to the API, parse and validate response."""
+        envelope = _SOAP_ENVELOPE.format(body=body)
+        headers = {
+            "Content-Type": "text/xml; charset=utf-8",
+            "SOAPAction": f"{API_NAMESPACE}{soap_action}",
+        }
+        if self._cookies:
+            headers["Cookie"] = "; ".join(
+                f"{k}={v}" for k, v in self._cookies.items()
+            )
+
+        try:
+            async with self._session.post(
+                API_ENDPOINT,
+                data=envelope.encode("utf-8"),
+                headers=headers,
+                timeout=_REQUEST_TIMEOUT,
+            ) as resp:
+                if store_cookies:
+                    for cookie in resp.cookies.values():
+                        self._cookies[cookie.key] = cookie.value
+
+                resp_text = await resp.text()
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            raise VitotrolError(f"Connection error: {err}") from err
+
+        try:
+            root = _safe_xml_fromstring(resp_text)
+        except ElementTree.ParseError as err:
+            raise VitotrolError(f"Invalid XML response: {err}") from err
+
+        _strip_ns(root)
+
+        # Find the operation result element
+        result_tag = f"{soap_action}Result"
+        result_el = root.find(f".//{result_tag}")
+        if result_el is None:
+            raise VitotrolError(
+                f"Missing {result_tag} in response"
+            )
+
+        ergebnis_el = result_el.find("Ergebnis")
+        if ergebnis_el is None:
+            raise VitotrolError("Missing Ergebnis in response")
+
+        result_code = int(ergebnis_el.text or "-1")
+        if result_code != 0:
+            error_text = _find_text_opt(result_el, "ErgebnisText") or "Unknown error"
+            if soap_action == "Login":
+                raise VitotrolAuthError(
+                    f"Login failed: {error_text} (code {result_code})"
+                )
+            raise VitotrolError(
+                f"{soap_action} failed: {error_text} (code {result_code})"
+            )
+
+        return result_el
+
+
+# ------------------------------------------------------------------
+# Module-level helpers
+# ------------------------------------------------------------------
+
+
+def _xml_escape(text: str) -> str:
+    """Escape special characters for XML content."""
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&apos;")
+    )
+
+
+def _find_text(element: ElementTree.Element, tag: str) -> str:
+    """Find a child element and return its text, raising on missing."""
+    child = element.find(f".//{tag}")
+    if child is None or child.text is None:
+        raise VitotrolError(f"Missing <{tag}> in response")
+    return child.text
+
+
+def _find_text_opt(element: ElementTree.Element, tag: str) -> str | None:
+    """Find a child element and return its text, or None if missing."""
+    child = element.find(f".//{tag}")
+    if child is None:
+        return None
+    return child.text

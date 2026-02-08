@@ -1,0 +1,88 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Vitotrol",
+        "description": "Enter your Viessmann Vitotrol account credentials.",
+        "data": {
+          "username": "Email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid username or password.",
+      "cannot_connect": "Unable to connect to the Vitotrol service.",
+      "no_devices": "No devices found under this account."
+    },
+    "abort": {
+      "already_configured": "This account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Vitotrol Options",
+        "data": {
+          "scan_interval": "Scan interval (seconds)",
+          "custom_attributes": "Custom attributes (one per line, format: name-0xHHHH)"
+        }
+      }
+    },
+    "error": {
+      "invalid_custom_attr": "Invalid custom attribute format. Use name-0xHHHH (e.g. my_sensor-0x2637)."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "indoor_temperature": { "name": "Indoor temperature" },
+      "outdoor_temperature": { "name": "Outdoor temperature" },
+      "boiler_temperature": { "name": "Boiler temperature" },
+      "hot_water_temperature": { "name": "Hot water temperature" },
+      "hot_water_outlet_temperature": { "name": "Hot water outlet temperature" },
+      "heating_water_outlet_temperature": { "name": "Heating water outlet temperature" },
+      "smoke_temperature": { "name": "Smoke temperature" },
+      "burner_hours": { "name": "Burner hours" },
+      "burner_starts": { "name": "Burner starts" },
+      "operating_mode": {
+        "name": "Operating mode",
+        "state": {
+          "standby": "Standby",
+          "reduced": "Reduced",
+          "normal": "Normal",
+          "continuous_normal": "Continuous normal"
+        }
+      },
+      "valve_3way_status": {
+        "name": "3-way valve",
+        "state": {
+          "undefined": "Undefined",
+          "heating": "Heating",
+          "middle": "Middle",
+          "hot_water": "Hot water"
+        }
+      },
+      "current_error": { "name": "Current error" }
+    },
+    "binary_sensor": {
+      "burner": { "name": "Burner" },
+      "internal_pump": { "name": "Internal pump" },
+      "heating_pump": { "name": "Heating pump" },
+      "circulation_pump": { "name": "Circulation pump" },
+      "frost_protection": { "name": "Frost protection" },
+      "holiday_mode": { "name": "Holiday mode" }
+    },
+    "climate": {
+      "heating": { "name": "Heating" }
+    },
+    "switch": {
+      "party_mode": { "name": "Party mode" },
+      "energy_saving_mode": { "name": "Energy saving mode" }
+    },
+    "number": {
+      "hot_water_setpoint": { "name": "Hot water setpoint" },
+      "reduced_temperature_setpoint": { "name": "Reduced temperature setpoint" },
+      "party_mode_temperature": { "name": "Party mode temperature" }
+    }
+  }
+}
