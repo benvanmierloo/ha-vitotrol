@@ -29,13 +29,12 @@ Coordinator data structure: `dict[int, dict[int, str]]` → `{device_id: {attr_i
 - **Session lifetime is unknown**: the original Go code re-logins every loop. Our strategy: login once, re-login + retry on any API error.
 - All responses have a `<Ergebnis>` result code (0 = success) and `<ErgebnisText>` error message.
 
-## Design Documents
+## Documentation
 
-Detailed specs live in `docs/`:
-- `01-findings.md` — Full API documentation, all 28+ attribute IDs with types/access, SOAP request/response formats
-- `02-architecture.md` — System diagram, entity mappings (which attr → which HA entity), data flow
-- `03-implementation-plan.md` — Phased build plan with dependency graph
-- `04-attribute-configurability.md` — GetTypeInfo-based discovery + HA enable/disable pattern for all attributes
+Contributor docs live in `docs/`:
+- `api-reference.md` — Full Vitotrol SOAP API reference (operations, attributes, constraints)
+- `architecture.md` — System diagram, layers, entity mappings, data flow
+- `contributing.md` — Dev setup, conventions, how to add attributes/platforms
 
 ## Key Attribute IDs
 
@@ -46,6 +45,6 @@ Switches (RW): PartyMode=7855, EnergySavingMode=7852. Status (RO): BurnerState=6
 
 All device attributes are discovered via GetTypeInfo and created as entities. Known attributes are enabled by default; all others are disabled by default and can be enabled via standard HA UI.
 
-## Implementation Order
+## Dependency Order
 
-Files must be built in dependency order: `const.py` → `api.py` → `coordinator.py` → `entity.py` → `config_flow.py` → `__init__.py` → entity platforms (parallel) → translations/metadata (parallel).
+`const.py` → `api.py` → `coordinator.py` → `entity.py` → `config_flow.py` → `__init__.py` → entity platforms.

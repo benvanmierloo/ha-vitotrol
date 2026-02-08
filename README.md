@@ -117,7 +117,22 @@ This is inherent to the API design. The default 300-second scan interval balance
 - **Single session**: The integration uses one session per account. Running the Vitotrol mobile app simultaneously may cause session conflicts.
 - **Cloud dependency**: All communication goes through Viessmann's cloud servers. If their service is down, the integration won't work.
 
-## Support
+## Discovery Script
+
+A standalone script is included to explore what your device supports, without needing Home Assistant:
+
+```
+pip install -r scripts/requirements.txt
+python scripts/discover.py --user YOUR_EMAIL --password YOUR_PASSWORD --values
+```
+
+This dumps every attribute your device exposes (IDs, names, types, units, min/max, read/write flags) and optionally their current values. Useful for identifying attributes to add to the integration.
+
+## Contributing
+
+The easiest way to contribute is adding attributes for your device. The [contributor guide](docs/contributing.md) walks through the process — it's a one-line table addition per attribute.
+
+For deeper changes, see the [architecture overview](docs/architecture.md) and [API reference](docs/api-reference.md).
 
 Found a bug or have a feature request? [Open an issue](https://github.com/benvanmierloo/ha-vitotrol/issues).
 
