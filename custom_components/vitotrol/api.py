@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from xml.etree import ElementTree
 
@@ -113,11 +114,11 @@ class VitotrolAPI:
         """Authenticate and store the session cookie."""
         body = (
             "<Login>"
-            f"<AppId>{APP_ID}</AppId>"
-            f"<AppVersion>{APP_VERSION}</AppVersion>"
-            f"<Betriebssystem>{APP_OS}</Betriebssystem>"
             f"<Benutzer>{_xml_escape(self._username)}</Benutzer>"
             f"<Passwort>{_xml_escape(self._password)}</Passwort>"
+            f"<Betriebssystem>{APP_OS}</Betriebssystem>"
+            f"<AppId>{APP_ID}</AppId>"
+            f"<AppVersion>{APP_VERSION}</AppVersion>"
             "</Login>"
         )
         await self._send_request("Login", body, store_cookies=True)
@@ -238,8 +239,8 @@ class VitotrolAPI:
         )
         body = (
             "<RefreshData>"
-            f"<GeraetId>{device.device_id}</GeraetId>"
             f"<AnlageId>{device.location_id}</AnlageId>"
+            f"<GeraetId>{device.device_id}</GeraetId>"
             f"<DatenpunktIds>{dp_list}</DatenpunktIds>"
             "</RefreshData>"
         )
@@ -267,34 +268,27 @@ class VitotrolAPI:
     ) -> None:
         """Fire RefreshData and poll until complete or timeout."""
         refresh_id = await self.refresh_data(device, attr_ids)
-
-        await asyncio.sleep(REFRESH_INITIAL_WAIT)
-
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + REFRESH_TIMEOUT
-        while True:
-            status = await self.request_refresh_status(refresh_id)
-            if status != 0:
-                _LOGGER.debug("RefreshData complete, status=%d", status)
-                return
-
-            if loop.time() >= deadline:
-                raise VitotrolError(
-                    f"RefreshData timed out after {REFRESH_TIMEOUT}s"
-                )
-
-            await asyncio.sleep(REFRESH_MIN_WAIT)
+        await self._poll_async_status(
+            refresh_id,
+            self.request_refresh_status,
+            "RefreshData",
+            REFRESH_INITIAL_WAIT,
+            REFRESH_MIN_WAIT,
+            REFRESH_TIMEOUT,
+        )
 
     async def write_data(
         self, device: VitotrolDevice, attr_id: int, value: str
     ) -> str:
         """Write a value to the device. Returns a refresh ID."""
+        # API uses German locale: decimal separator is comma, not period
+        wire_value = value.replace(".", ",")
         body = (
             "<WriteData>"
             f"<AnlageId>{device.location_id}</AnlageId>"
             f"<GeraetId>{device.device_id}</GeraetId>"
             f"<DatapointId>{attr_id}</DatapointId>"
-            f"<Wert>{_xml_escape(value)}</Wert>"
+            f"<Wert>{_xml_escape(wire_value)}</Wert>"
             "</WriteData>"
         )
         root = await self._send_request("WriteData", body)
@@ -326,27 +320,62 @@ class VitotrolAPI:
     ) -> None:
         """Fire WriteData and poll until complete or timeout."""
         refresh_id = await self.write_data(device, attr_id, value)
-
-        await asyncio.sleep(WRITE_INITIAL_WAIT)
-
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + WRITE_TIMEOUT
-        while True:
-            status = await self.request_write_status(refresh_id)
-            if status != 0:
-                _LOGGER.debug("WriteData complete, status=%d", status)
-                return
-
-            if loop.time() >= deadline:
-                raise VitotrolError(
-                    f"WriteData timed out after {WRITE_TIMEOUT}s"
-                )
-
-            await asyncio.sleep(WRITE_MIN_WAIT)
+        await self._poll_async_status(
+            refresh_id,
+            self.request_write_status,
+            "WriteData",
+            WRITE_INITIAL_WAIT,
+            WRITE_MIN_WAIT,
+            WRITE_TIMEOUT,
+        )
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    async def _poll_async_status(
+        self,
+        refresh_id: str,
+        poll_fn: Callable[[str], Awaitable[int]],
+        operation: str,
+        initial_wait: float,
+        min_wait: float,
+        timeout: float,
+    ) -> None:
+        """Poll an async operation until complete or timeout.
+
+        Status code semantics are not documented in the WSDL (just
+        ``unsignedByte``).  The values below are inferred from the Go
+        library go-vitotrol's ``waitAsyncStatus`` and are assumptions,
+        not verified facts:
+
+        - 0 ...... pending (not yet started)
+        - 1, 3 ... in progress
+        - 4 ...... success
+        - 9 ...... success (observed for some write operations)
+        - other ... unexpected / error
+        """
+        await asyncio.sleep(initial_wait)
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while True:
+            status = await poll_fn(refresh_id)
+
+            if status >= 4:
+                if status not in (4, 9):
+                    raise VitotrolError(
+                        f"{operation} failed with unexpected status {status}"
+                    )
+                _LOGGER.debug("%s complete, status=%d", operation, status)
+                return
+
+            if loop.time() >= deadline:
+                raise VitotrolError(
+                    f"{operation} timed out after {timeout}s"
+                )
+
+            await asyncio.sleep(min_wait)
 
     async def _send_request(
         self,
