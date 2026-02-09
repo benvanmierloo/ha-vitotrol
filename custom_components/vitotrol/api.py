@@ -281,8 +281,8 @@ class VitotrolAPI:
         self, device: VitotrolDevice, attr_id: int, value: str
     ) -> str:
         """Write a value to the device. Returns a refresh ID."""
-        # API uses German locale: decimal separator is comma, not period
-        wire_value = value.replace(".", ",")
+        # The API only accepts whole numbers — strip any decimal part.
+        wire_value = str(int(float(value))) if "." in value else value
         body = (
             "<WriteData>"
             f"<AnlageId>{device.location_id}</AnlageId>"

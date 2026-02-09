@@ -11,10 +11,10 @@ Home Assistant custom component (`custom_components/vitotrol/`) for Viessmann Vi
 Five layers, each depending only on the layer below:
 
 1. **`api.py`** — Async SOAP client (pure Python, no HA deps). Manages cookie-based sessions via a private dict over HA's shared `aiohttp.ClientSession`. Implements the async wait pattern: fire RefreshData/WriteData, poll status, then read results.
-2. **`coordinator.py`** — `DataUpdateCoordinator` that polls devices on a configurable interval (default 60s). Handles re-auth on failure. Uses `GetTypeInfo` to discover all device attributes at setup; creates entities for all of them (known = enabled, rest = disabled by default).
+2. **`coordinator.py`** — `DataUpdateCoordinator` that polls devices on a configurable interval (default 300s). Handles re-auth on failure. Uses `GetTypeInfo` to discover all device attributes at setup; creates entities for all of them (known = enabled, rest = disabled by default).
 3. **`config_flow.py`** — UI config flow (credentials) + options flow (scan interval).
 4. **`__init__.py`** — Wires API → coordinator → platform forwarding.
-5. **Entity platforms** (`sensor.py`, `binary_sensor.py`, `climate.py`, `switch.py`, `number.py`) — All extend `VitotrolEntity(CoordinatorEntity)`. Write operations use optimistic state updates.
+5. **Entity platforms** (`sensor.py`, `binary_sensor.py`, `climate.py`, `switch.py`, `number.py`, `select.py`) — All extend `VitotrolEntity(CoordinatorEntity)`. Write operations use optimistic state updates.
 
 Coordinator data structure: `dict[int, dict[int, str]]` → `{device_id: {attr_id: raw_value_string}}`. Entities parse raw strings to their native types.
 
@@ -47,4 +47,4 @@ All device attributes are discovered via GetTypeInfo and created as entities. Kn
 
 ## Dependency Order
 
-`const.py` → `api.py` → `coordinator.py` → `entity.py` → `config_flow.py` → `__init__.py` → entity platforms.
+`const.py` → `api.py` → `attributes.py` → `coordinator.py` → `entity.py` → `config_flow.py` → `__init__.py` → entity platforms.

@@ -33,7 +33,7 @@ custom_components/vitotrol/
 └── diagnostics.py       # Diagnostics export
 ```
 
-Dependencies flow downward: `const.py` → `api.py` → `coordinator.py` → `entity.py` → platform files.
+Dependencies flow downward: `const.py` → `api.py` → `attributes.py` → `coordinator.py` → `entity.py` → platform files.
 
 ## Adding a Known Attribute
 

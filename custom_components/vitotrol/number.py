@@ -49,6 +49,7 @@ class VitotrolNumber(VitotrolEntity, NumberEntity):
     """Number entity for a writable Vitotrol attribute."""
 
     _attr_mode = NumberMode.BOX
+    _attr_suggested_display_precision = 0
 
     def __init__(
         self,
@@ -86,11 +87,8 @@ class VitotrolNumber(VitotrolEntity, NumberEntity):
         except (ValueError, TypeError):
             pass
 
-        # Step: 0.5 for temperature, 1.0 otherwise
-        if self._attr_device_class == NumberDeviceClass.TEMPERATURE:
-            self._attr_native_step = 0.5
-        else:
-            self._attr_native_step = 1.0
+        # The API only accepts whole numbers for writable attributes.
+        self._attr_native_step = 1.0
 
     @property
     def available(self) -> bool:
@@ -98,20 +96,21 @@ class VitotrolNumber(VitotrolEntity, NumberEntity):
         return super().available and self._vitotrol_attr_id in self._device_data
 
     @property
-    def native_value(self) -> float | None:
+    def native_value(self) -> int | None:
         """Return the current value."""
         raw = self._get_attr_value(self._vitotrol_attr_id)
         if raw is None:
             return None
         try:
-            return float(raw)
-        except ValueError:
+            return int(float(raw))
+        except (ValueError, OverflowError):
             return None
 
     async def async_set_native_value(self, value: float) -> None:
         """Set a new value."""
+        str_value = str(int(value))
         await self.coordinator.async_write(
-            self._device, self._vitotrol_attr_id, str(value)
+            self._device, self._vitotrol_attr_id, str_value
         )
-        self._update_coordinator_data(self._vitotrol_attr_id, str(value))
+        self._update_coordinator_data(self._vitotrol_attr_id, str_value)
         self.async_write_ha_state()

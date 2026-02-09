@@ -145,8 +145,8 @@ The climate entity combines multiple attributes into a single HA control:
 | HA Mode | Vitotrol Mode |
 |---|---|
 | Off | 0 (standby) |
+| Dry | 1 (DHW only) |
 | Auto | 2 (heating + DHW, schedule-based) |
-| Heat | 4 (continuous normal) |
 
 **Presets:** ECO = energy saving mode, Boost = party mode. Mutually exclusive.
 
@@ -171,11 +171,12 @@ Coordinator._async_update_data()
 
 ```
 ClimateEntity.async_set_temperature(temperature=22.0)
-  ├── api.write_data_wait(device, attr_id, "22.0")
-  │     ├── SOAP WriteData           → refresh_id
-  │     ├── sleep(4s)
-  │     └── poll RequestWriteStatus until done
-  ├── Optimistic update: self._attr_target_temperature = 22.0
+  ├── coordinator.async_write(device, attr_id, "22.0")
+  │     └── api.write_data_wait(device, attr_id, "22.0")
+  │           ├── SOAP WriteData           → refresh_id
+  │           ├── sleep(4s)
+  │           └── poll RequestWriteStatus until done
+  ├── Optimistic update: _update_coordinator_data(attr_id, "22.0")
   └── self.async_write_ha_state()    → immediate UI update
 ```
 

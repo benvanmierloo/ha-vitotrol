@@ -12,7 +12,7 @@ A Home Assistant custom integration for **Viessmann heating systems** that use t
 
 | Platform | Entities | Description |
 |---|---|---|
-| **Climate** | Heating | HVAC modes (Off / Auto / Heat), ECO and Boost presets, target temperature control |
+| **Climate** | Heating | HVAC modes (Off / Dry / Auto), ECO and Boost presets, target temperature control |
 | **Sensor** | 12+ sensors | Indoor, outdoor, boiler, hot water, smoke, and heating water temperatures. Burner hours, burner starts, operating mode, 3-way valve status, current error |
 | **Binary sensor** | 6 sensors | Burner, internal pump, heating pump, circulation pump, frost protection, holiday mode |
 | **Switch** | 2 switches | Party mode, energy saving mode |
@@ -67,8 +67,8 @@ The climate entity maps Viessmann operating modes to Home Assistant:
 | HA Mode | Vitotrol Mode | Description |
 |---|---|---|
 | **Off** | Mode 0 | System off |
+| **Dry** | Mode 1 | Domestic hot water only (no space heating). Uses HA's "Dry" mode as the closest match for a DHW-only mode. |
 | **Auto** | Mode 2 | Heating + domestic hot water (recommended) |
-| **Heat** | Mode 4 | Continuous normal temperature |
 
 ### Presets
 
