@@ -12,6 +12,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import VitotrolAPI, VitotrolError
 from .const import (
+    CONF_EXCLUDED_ATTRS,
     CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -53,6 +54,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: VitotrolConfigEntry) -> 
 
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = VitotrolCoordinator(hass, api, devices, scan_interval)
+
+    # Apply attribute exclusions discovered during config flow setup
+    excluded_attrs = entry.data.get(CONF_EXCLUDED_ATTRS, {})
+    if excluded_attrs:
+        coordinator.set_excluded_attrs(excluded_attrs)
+        _LOGGER.info("Loaded excluded attributes: %s", excluded_attrs)
 
     # Discover all device attributes via GetTypeInfo
     try:

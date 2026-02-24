@@ -41,6 +41,7 @@ WRITE_TIMEOUT = 60
 
 # Config entry keys
 CONF_SCAN_INTERVAL = "scan_interval"
+CONF_EXCLUDED_ATTRS = "excluded_attrs"
 
 # ---------------------------------------------------------------------------
 # Attribute IDs

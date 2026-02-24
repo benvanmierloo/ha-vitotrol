@@ -10,6 +10,9 @@
         }
       }
     },
+    "progress": {
+      "scanning_attributes": "Scanning device attributes. Verifying which datapoints your device supports. This may take a moment."
+    },
     "error": {
       "invalid_auth": "Invalid username or password.",
       "cannot_connect": "Unable to connect to the Vitotrol service.",

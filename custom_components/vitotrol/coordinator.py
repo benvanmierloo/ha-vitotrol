@@ -39,12 +39,24 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
         self._attribute_catalog: dict[int, dict[int, AttributeTypeInfo]] = {}
         # Per-entity attr_id registrations: {device_id: {entity_uid: {attr_ids}}}
         self._entity_attr_ids: dict[int, dict[str, set[int]]] = {}
+        # Per-device excluded attrs (probed bad during setup)
+        self._excluded_attrs: dict[int, set[int]] = {}
+
+    def set_excluded_attrs(self, excluded: dict[str, list[int]]) -> None:
+        """Load excluded attr_ids (from config entry data)."""
+        self._excluded_attrs = {
+            int(did): set(aids) for did, aids in excluded.items()
+        }
 
     def get_attribute_catalog(
         self, device_id: int
     ) -> dict[int, AttributeTypeInfo]:
-        """Return the attribute catalog for a device."""
-        return self._attribute_catalog.get(device_id, {})
+        """Return the attribute catalog for a device (excluding bad attrs)."""
+        catalog = self._attribute_catalog.get(device_id, {})
+        excluded = self._excluded_attrs.get(device_id, set())
+        if not excluded:
+            return catalog
+        return {aid: info for aid, info in catalog.items() if aid not in excluded}
 
     async def async_setup_type_info(self) -> None:
         """Discover all device attributes via GetTypeInfo.
@@ -82,13 +94,17 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
         """Return attr_ids to poll: union of all registered entity needs.
 
         Before entity setup (first refresh), falls back to enabled-by-default
-        registry entries that the device actually supports.
+        registry entries that the device actually supports.  Excluded attrs
+        (probed bad during setup) are always filtered out.
         """
+        excluded = self._excluded_attrs.get(device_id, set())
+
         device_entities = self._entity_attr_ids.get(device_id, {})
         if device_entities:
             result: set[int] = set()
             for attr_ids in device_entities.values():
                 result.update(attr_ids)
+            result -= excluded
             return list(result)
 
         # Fallback for first refresh before entities are registered
@@ -99,6 +115,7 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
             if meta.enabled_by_default
             and attr_id in catalog
             and catalog[attr_id].readable
+            and attr_id not in excluded
         ]
 
     # ------------------------------------------------------------------
