@@ -105,13 +105,14 @@ class VitotrolConfigFlow(ConfigFlow, domain=DOMAIN):
         """Show progress while probing device attributes."""
         if self._scan_task is None:
             self._scan_task = self.hass.async_create_task(
-                self._async_scan_attributes_task()
+                self._async_probe_all_devices()
             )
 
         if not self._scan_task.done():
             return self.async_show_progress(
                 step_id="scanning",
                 progress_action="scanning_attributes",
+                progress_task=self._scan_task,
             )
 
         try:
@@ -146,13 +147,6 @@ class VitotrolConfigFlow(ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     # Background scanning logic
     # ------------------------------------------------------------------
-
-    async def _async_scan_attributes_task(self) -> dict[str, list[int]]:
-        """Probe all device attrs in background, signal flow when done."""
-        try:
-            return await self._async_probe_all_devices()
-        finally:
-            self.hass.config_entries.flow.async_configure(flow_id=self.flow_id)
 
     async def _async_probe_all_devices(self) -> dict[str, list[int]]:
         """Probe attributes for every device, return excluded map.
