@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -15,6 +17,8 @@ from .api import AttributeTypeInfo, VitotrolDevice
 from .attributes import ATTRIBUTE_REGISTRY, AttrMeta
 from .coordinator import VitotrolCoordinator
 from .entity import VitotrolEntity
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -105,6 +109,12 @@ class VitotrolSensor(VitotrolEntity, SensorEntity):
             try:
                 return float(raw)
             except ValueError:
+                _LOGGER.debug(
+                    "Sensor %s (attr %d): cannot parse %r as float",
+                    self._attr_name,
+                    self._vitotrol_attr_id,
+                    raw,
+                )
                 return None
 
         return raw

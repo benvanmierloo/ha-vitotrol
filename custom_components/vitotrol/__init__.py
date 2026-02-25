@@ -11,6 +11,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import VitotrolAPI, VitotrolError
+from .attributes import ATTRIBUTE_REGISTRY
 from .const import (
     CONF_EXCLUDED_ATTRS,
     CONF_SCAN_INTERVAL,
@@ -59,7 +60,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: VitotrolConfigEntry) -> 
     excluded_attrs = entry.data.get(CONF_EXCLUDED_ATTRS, {})
     if excluded_attrs:
         coordinator.set_excluded_attrs(excluded_attrs)
-        _LOGGER.info("Loaded excluded attributes: %s", excluded_attrs)
+        for did_str, aids in excluded_attrs.items():
+            names = [
+                f"{aid}:{ATTRIBUTE_REGISTRY[aid].name}"
+                if aid in ATTRIBUTE_REGISTRY
+                else str(aid)
+                for aid in aids
+            ]
+            _LOGGER.info(
+                "Device %s: loaded %d excluded attribute(s): %s",
+                did_str,
+                len(aids),
+                ", ".join(names),
+            )
 
     # Discover all device attributes via GetTypeInfo
     try:

@@ -138,8 +138,8 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
         """Fetch data from the Vitotrol API."""
         try:
             return await self._do_update()
-        except VitotrolAuthError:
-            _LOGGER.debug("Auth error, re-logging in and retrying")
+        except VitotrolAuthError as err:
+            _LOGGER.debug("Auth error (%s), re-logging in and retrying", err)
             try:
                 await self.api.login()
                 return await self._do_update()
@@ -183,10 +183,11 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
 
             try:
                 await self.api.refresh_data_wait(device, attr_ids)
-            except VitotrolError:
+            except VitotrolError as err:
                 _LOGGER.warning(
-                    "RefreshData failed for %s, reading cached data",
+                    "RefreshData failed for %s: %s — reading cached data",
                     device.device_name,
+                    err,
                 )
 
             data = await self.api.get_data(device, attr_ids)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
@@ -12,6 +14,8 @@ from .api import AttributeTypeInfo, VitotrolDevice
 from .attributes import ATTRIBUTE_REGISTRY, AttrMeta
 from .coordinator import VitotrolCoordinator
 from .entity import VitotrolEntity
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -104,6 +108,12 @@ class VitotrolNumber(VitotrolEntity, NumberEntity):
         try:
             return int(float(raw))
         except (ValueError, OverflowError):
+            _LOGGER.debug(
+                "Number %s (attr %d): cannot parse %r as number",
+                self._attr_name,
+                self._vitotrol_attr_id,
+                raw,
+            )
             return None
 
     async def async_set_native_value(self, value: float) -> None:

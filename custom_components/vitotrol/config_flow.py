@@ -174,18 +174,42 @@ class VitotrolConfigFlow(ConfigFlow, domain=DOMAIN):
             # Optimistic: try all at once
             try:
                 await self._api.get_data(device, readable_ids)
-            except VitotrolError:
+                _LOGGER.debug(
+                    "Device %s (%d): all %d attributes passed initial probe",
+                    device.device_name,
+                    device.device_id,
+                    len(readable_ids),
+                )
+            except VitotrolError as err:
                 # Something is bad — bisect to find which attrs
+                _LOGGER.debug(
+                    "Device %s (%d): bulk probe failed (%s), bisecting %d attrs to find bad ones",
+                    device.device_name,
+                    device.device_id,
+                    err,
+                    len(readable_ids),
+                )
                 bad = await self._bisect_bad_attrs(device, readable_ids)
                 if bad:
+                    bad_names = []
+                    for aid in bad:
+                        info = catalog.get(aid)
+                        name = f"{aid}:{info.name}" if info else str(aid)
+                        bad_names.append(name)
                     _LOGGER.warning(
                         "Device %s (%d): excluding %d unsupported attribute(s): %s",
                         device.device_name,
                         device.device_id,
                         len(bad),
-                        bad,
+                        ", ".join(bad_names),
                     )
                     excluded[str(device.device_id)] = bad
+                else:
+                    _LOGGER.debug(
+                        "Device %s (%d): bisect found no individual bad attrs (transient error?)",
+                        device.device_name,
+                        device.device_id,
+                    )
 
         return excluded
 
@@ -199,7 +223,13 @@ class VitotrolConfigFlow(ConfigFlow, domain=DOMAIN):
             try:
                 await self._api.get_data(device, attr_ids)
                 return []
-            except VitotrolError:
+            except VitotrolError as err:
+                _LOGGER.debug(
+                    "Device %s: attr %s confirmed bad: %s",
+                    device.device_name,
+                    attr_ids[0],
+                    err,
+                )
                 return list(attr_ids)
 
         mid = len(attr_ids) // 2
