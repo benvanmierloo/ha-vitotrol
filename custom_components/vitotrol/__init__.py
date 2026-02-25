@@ -82,15 +82,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: VitotrolConfigEntry) -> 
             f"Failed to discover device attributes: {err}"
         ) from err
 
-    entry.runtime_data = VitotrolRuntimeData(api=api, coordinator=coordinator)
-
-    # Forward to platforms FIRST so entities register their attr_ids,
-    # then refresh with the correct poll set.
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
+    # First refresh uses the fallback poll set (enabled-by-default attrs from
+    # the attribute registry).  After entities register their attr_ids the
+    # coordinator will poll exactly what is needed.
     await coordinator.async_config_entry_first_refresh()
 
-    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+    entry.runtime_data = VitotrolRuntimeData(api=api, coordinator=coordinator)
+
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
 
@@ -100,10 +99,3 @@ async def async_unload_entry(
 ) -> bool:
     """Unload a Vitotrol config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-
-
-async def _async_options_updated(
-    hass: HomeAssistant, entry: VitotrolConfigEntry
-) -> None:
-    """Handle options update — reload the integration."""
-    await hass.config_entries.async_reload(entry.entry_id)
