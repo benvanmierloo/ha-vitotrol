@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
@@ -44,14 +43,6 @@ class VitotrolConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    def __init__(self) -> None:
-        """Initialise flow state."""
-        self._api: VitotrolAPI | None = None
-        self._devices: list[VitotrolDevice] = []
-        self._data: dict[str, Any] = {}
-        self._scan_task: asyncio.Task[dict[str, list[int]]] | None = None
-        self._excluded_attrs: dict[str, list[int]] = {}
-
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -81,13 +72,19 @@ class VitotrolConfigFlow(ConfigFlow, domain=DOMAIN):
                 if not devices:
                     errors["base"] = "no_devices"
                 else:
-                    self._api = api
-                    self._devices = devices
-                    self._data = {
+                    # Probe attributes inline — typically takes 1-2s
+                    excluded = await self._async_probe_all_devices(
+                        api, devices
+                    )
+                    data: dict[str, Any] = {
                         CONF_USERNAME: username,
                         CONF_PASSWORD: password,
                     }
-                    return await self.async_step_scanning()
+                    if excluded:
+                        data[CONF_EXCLUDED_ATTRS] = excluded
+                    return self.async_create_entry(
+                        title=username, data=data
+                    )
 
         return self.async_show_form(
             step_id="user",
@@ -96,69 +93,21 @@ class VitotrolConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # Attribute scanning step — probes all attrs from GetTypeInfo
+    # Attribute probing logic
     # ------------------------------------------------------------------
 
-    async def async_step_scanning(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Show progress while probing device attributes."""
-        if self._scan_task is None:
-            self._scan_task = self.hass.async_create_task(
-                self._async_probe_all_devices()
-            )
-
-        if not self._scan_task.done():
-            return self.async_show_progress(
-                step_id="scanning",
-                progress_action="scanning_attributes",
-                progress_task=self._scan_task,
-            )
-
-        try:
-            self._excluded_attrs = self._scan_task.result()
-        except Exception:
-            _LOGGER.exception("Attribute scan failed")
-            return self.async_show_progress_done(next_step_id="scanning_failed")
-
-        return self.async_show_progress_done(next_step_id="finish")
-
-    async def async_step_scanning_failed(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Handle scan failure — still create the entry (no exclusions)."""
-        return self.async_create_entry(
-            title=self._data[CONF_USERNAME],
-            data=self._data,
-        )
-
-    async def async_step_finish(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Create the config entry after a successful scan."""
-        data = {**self._data}
-        if self._excluded_attrs:
-            data[CONF_EXCLUDED_ATTRS] = self._excluded_attrs
-        return self.async_create_entry(
-            title=self._data[CONF_USERNAME],
-            data=data,
-        )
-
-    # ------------------------------------------------------------------
-    # Background scanning logic
-    # ------------------------------------------------------------------
-
-    async def _async_probe_all_devices(self) -> dict[str, list[int]]:
+    async def _async_probe_all_devices(
+        self, api: VitotrolAPI, devices: list[VitotrolDevice]
+    ) -> dict[str, list[int]]:
         """Probe attributes for every device, return excluded map.
 
         Returns ``{device_id_str: [bad_attr_id, ...]}`` (only devices
         with exclusions appear).
         """
-        assert self._api is not None
         excluded: dict[str, list[int]] = {}
 
-        for device in self._devices:
-            catalog = await self._api.get_type_info(device)
+        for device in devices:
+            catalog = await api.get_type_info(device)
             readable_ids = sorted(
                 aid for aid, info in catalog.items() if info.readable
             )
@@ -167,7 +116,7 @@ class VitotrolConfigFlow(ConfigFlow, domain=DOMAIN):
 
             # Optimistic: try all at once
             try:
-                await self._api.get_data(device, readable_ids)
+                await api.get_data(device, readable_ids)
                 _LOGGER.debug(
                     "Device %s (%d): all %d attributes passed initial probe",
                     device.device_name,
@@ -183,7 +132,7 @@ class VitotrolConfigFlow(ConfigFlow, domain=DOMAIN):
                     err,
                     len(readable_ids),
                 )
-                bad = await self._bisect_bad_attrs(device, readable_ids)
+                bad = await self._bisect_bad_attrs(api, device, readable_ids)
                 if bad:
                     bad_names = []
                     for aid in bad:
@@ -208,14 +157,15 @@ class VitotrolConfigFlow(ConfigFlow, domain=DOMAIN):
         return excluded
 
     async def _bisect_bad_attrs(
-        self, device: VitotrolDevice, attr_ids: list[int]
+        self,
+        api: VitotrolAPI,
+        device: VitotrolDevice,
+        attr_ids: list[int],
     ) -> list[int]:
         """Binary-search to isolate attr_ids that cause API errors."""
-        assert self._api is not None
-
         if len(attr_ids) <= 1:
             try:
-                await self._api.get_data(device, attr_ids)
+                await api.get_data(device, attr_ids)
                 return []
             except VitotrolError as err:
                 _LOGGER.debug(
@@ -232,9 +182,9 @@ class VitotrolConfigFlow(ConfigFlow, domain=DOMAIN):
         bad: list[int] = []
         for half in (left, right):
             try:
-                await self._api.get_data(device, half)
+                await api.get_data(device, half)
             except VitotrolError:
-                bad.extend(await self._bisect_bad_attrs(device, half))
+                bad.extend(await self._bisect_bad_attrs(api, device, half))
 
         return bad
 
