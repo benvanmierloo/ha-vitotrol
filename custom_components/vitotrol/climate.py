@@ -17,7 +17,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import VitotrolConfigEntry
 from .api import VitotrolDevice
-from .attributes import CLIMATE_CONFIG
+from .attributes import CLIMATE_CONFIGS, ClimateMeta
 from .coordinator import VitotrolCoordinator
 from .entity import VitotrolEntity
 
@@ -40,8 +40,12 @@ async def async_setup_entry(
 
     for device in coordinator.devices:
         catalog = coordinator.get_attribute_catalog(device.device_id)
-        if CLIMATE_CONFIG.operating_mode_attr in catalog:
-            entities.append(VitotrolClimate(coordinator, device, catalog))
+        for config in CLIMATE_CONFIGS:
+            if config.operating_mode_attr in catalog:
+                entities.append(
+                    VitotrolClimate(coordinator, device, catalog, config)
+                )
+                break
 
     async_add_entities(entities)
 
@@ -54,7 +58,6 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
     _attr_target_temperature_step = 1
     _attr_min_temp = 3
     _attr_max_temp = 37
-    _attr_hvac_modes = list(CLIMATE_CONFIG.hvac_to_vitotrol.keys())
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.PRESET_MODE
@@ -69,9 +72,11 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
         coordinator: VitotrolCoordinator,
         device: VitotrolDevice,
         catalog: dict,
+        climate_config: ClimateMeta,
     ) -> None:
         super().__init__(coordinator, device, "climate")
-        self._cfg = CLIMATE_CONFIG
+        self._cfg = climate_config
+        self._attr_hvac_modes = list(self._cfg.hvac_to_vitotrol.keys())
 
         # Min/max from GetTypeInfo for the target temp attribute
         target_info = catalog.get(self._cfg.target_temp_attr)
@@ -155,30 +160,15 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
     @property
     def hvac_action(self) -> HVACAction | None:
         """Return the current HVAC action."""
-        # DHW-only mode: burner may fire for hot water, show as DRYING
-        requested = self._get_attr_value(self._cfg.operating_mode_attr)
-        if requested == "1":
-            if self._cfg.burner_state_attr is not None:
-                burner_raw = self._get_attr_value(self._cfg.burner_state_attr)
-                if burner_raw == "1":
-                    return HVACAction.DRYING
-                if burner_raw is not None:
-                    return HVACAction.IDLE
-            return HVACAction.IDLE
-
-        if self._cfg.current_mode_attr is not None:
-            mode_raw = self._get_attr_value(self._cfg.current_mode_attr)
-            if mode_raw == "0":
-                return HVACAction.OFF
-
-        if self._cfg.burner_state_attr is not None:
-            burner_raw = self._get_attr_value(self._cfg.burner_state_attr)
-            if burner_raw == "1":
-                return HVACAction.HEATING
-            if burner_raw is not None:
-                return HVACAction.IDLE
-
-        return None
+        return self._cfg.resolve_action(
+            self._get_attr_value(self._cfg.operating_mode_attr),
+            self._get_attr_value(self._cfg.current_mode_attr)
+            if self._cfg.current_mode_attr is not None
+            else None,
+            self._get_attr_value(self._cfg.burner_state_attr)
+            if self._cfg.burner_state_attr is not None
+            else None,
+        )
 
     @property
     def preset_mode(self) -> str | None:

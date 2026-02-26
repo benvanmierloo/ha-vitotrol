@@ -12,10 +12,11 @@ To add a new attribute:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
-from homeassistant.components.climate import HVACMode
+from homeassistant.components.climate import HVACAction, HVACMode
 from homeassistant.components.number import NumberDeviceClass
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import (
@@ -53,6 +54,9 @@ class ClimateMeta:
     current_temp_attr: int
     target_temp_attr: int
     operating_mode_attr: int
+    resolve_action: Callable[
+        [str | None, str | None, str | None], HVACAction | None
+    ]
     current_mode_attr: int | None = None
     burner_state_attr: int | None = None
     eco_mode_attr: int | None = None
@@ -81,6 +85,7 @@ _CATEGORIES: dict[str, dict] = {
     "weight_h":   dict(platform="sensor", unit=UnitOfMass.KILOGRAMS, device_class=SensorDeviceClass.WEIGHT, state_class=SensorStateClass.MEASUREMENT),
     "enum":       dict(platform="sensor", device_class=SensorDeviceClass.ENUM),
     "text":       dict(platform="sensor"),
+    "cop":        dict(platform="sensor", state_class=SensorStateClass.MEASUREMENT, suggested_precision=1),
     "diag":       dict(platform="sensor", entity_category=EntityCategory.DIAGNOSTIC),
     # -- Binary sensor categories --------------------------------------------
     "running":    dict(platform="binary_sensor", device_class=BinarySensorDeviceClass.RUNNING, on_values=("1",)),
@@ -203,6 +208,93 @@ _TABLE: list[tuple[int, str, bool, str]] = [
     (7192,  "Hot water schedule",                False,  "none"),
     (7193,  "Circulation schedule",              False,  "none"),
 
+    # ====================================================================
+    # Heat pump attributes (VT 200, Vitocal, etc.)
+    # ====================================================================
+
+    # ---- HP temperature sensors ---------------------------------------------
+    (7299,  "Indoor temperature",               True,   "temp"),
+    (7692,  "Outdoor temperature",              True,   "temp"),
+    (7698,  "Flow temperature",                 True,   "temp"),
+    (7714,  "Hot water temperature",            True,   "temp"),
+    (7716,  "Hot water tank bottom temperature", False,  "temp"),
+    (7694,  "Primary flow temperature",         False,  "temp"),
+    (7696,  "Primary return temperature",       False,  "temp"),
+    (7700,  "Secondary return temperature",     False,  "temp"),
+
+    # ---- HP energy sensors (cumulative) -------------------------------------
+    (7350,  "DHW energy",                       True,   "energy"),
+    (8964,  "Heating energy",                   True,   "energy"),
+    (8966,  "Electrical energy consumption",    True,   "energy"),
+
+    # ---- HP COP sensors (seasonal performance factor) -----------------------
+    (7334,  "COP heating",                      True,   "cop"),
+    (7335,  "COP DHW",                          True,   "cop"),
+    (7364,  "COP total",                        True,   "cop"),
+
+    # ---- HP duration sensors ------------------------------------------------
+    (6650,  "Compressor operating hours",       True,   "duration"),
+
+    # ---- HP counter sensors -------------------------------------------------
+    (6830,  "Compressor starts",                True,   "counter"),
+
+    # ---- HP enum status sensors (see _ENUM_MAPS) ----------------------------
+    (8537,  "Current operating mode",           True,   "enum"),
+    (6181,  "Heating system schema",            False,  "enum"),
+    (6524,  "External mixer status",            False,  "enum"),
+
+    # ---- HP diagnostic sensors ----------------------------------------------
+    (7209,  "Current error",                    True,   "diag"),
+    (8051,  "Screed drying runtime 1",          False,  "diag"),
+    (8052,  "Screed drying runtime 2",          False,  "diag"),
+    (8053,  "Screed drying runtime 3",          False,  "diag"),
+
+    # ---- HP binary sensors --------------------------------------------------
+    (6710,  "Compressor",                       True,   "running"),
+    (12665, "Compressor 2",                     False,  "running"),
+    (6746,  "Heating circuit pump",             False,  "running"),
+    (6762,  "Circulation pump",                 False,  "running"),
+    (6768,  "Storage charge pump",              False,  "running"),
+    (8129,  "Holiday program",                  False,  "bool"),
+
+    # ---- HP number entities -------------------------------------------------
+    (6373,  "Reduced temperature setpoint",     True,   "num_temp"),
+    (8055,  "Party mode temperature",           True,   "num_temp"),
+    (7142,  "Hot water setpoint temperature",   True,   "num_temp"),
+    (7139,  "Hot water setpoint 2",             False,  "num_temp"),
+    (6165,  "Frost protection temperature",     False,  "num_temp"),
+    (6217,  "Bivalence temperature",            False,  "num_temp"),
+    (6332,  "Buffer tank hysteresis",           False,  "num_temp"),
+    (6333,  "Buffer tank max temperature",      False,  "num_temp"),
+    (6359,  "Max flow temperature",             False,  "num_temp"),
+    (6442,  "Flow temperature hysteresis",      False,  "num_temp"),
+    (7133,  "DHW hysteresis",                   False,  "num_temp"),
+    (7134,  "DHW additional heater hysteresis", False,  "num_temp"),
+    (7140,  "Hot water max temperature",        False,  "num_temp"),
+    (7782,  "Flow hysteresis off",              False,  "num_temp"),
+    (6363,  "Heating curve slope",              False,  "num"),
+    (6366,  "Heating curve level",              False,  "num"),
+    (7051,  "Compressor power level",           False,  "num"),
+
+    # ---- HP switch entities -------------------------------------------------
+    (8059,  "Party mode",                       True,   "switch"),
+    (8062,  "Energy saving mode",               True,   "switch"),
+    (6331,  "Buffer tank enabled",              False,  "switch"),
+    (8066,  "One-time DHW charge",              False,  "switch"),
+
+    # ---- HP select entities (see _ENUM_MAPS) --------------------------------
+    (6976,  "Solar controller",                 False,  "select"),
+    (7373,  "Operating mode",                   False,  "select"),
+
+    # ---- HP — no standalone entity (climate / not parseable) ----------------
+    (6369,  "Room temperature setpoint",        False,  "none"),
+    (7033,  "Device date/time",                 False,  "none"),
+    (8142,  "Holiday start date",               False,  "none"),
+    (8143,  "Holiday end date",                 False,  "none"),
+    (7292,  "Heating schedule",                 False,  "none"),
+    (7296,  "Hot water schedule",               False,  "none"),
+    (7543,  "Circulation schedule",             False,  "none"),
+
     # fmt: on
 ]
 
@@ -249,6 +341,27 @@ _ENUM_MAPS: dict[int, dict[str, str]] = {
     7271: {
         "0": "None", "1": "Vitosolic 100", "2": "Vitosolic 200",
         "3": "Solar module SM1", "4": "SM1 with DT2",
+    },
+    # -- Heat pump enum sensors ------------------------------------------------
+    8537: {"0": "Standby", "1": "Reduced", "2": "Normal", "3": "Fixed value"},
+    6181: {
+        "0": "DHW only", "1": "1 HC", "2": "1 HC + DHW",
+        "3": "1 mixer circuit", "4": "1 mixer circuit + DHW",
+        "5": "1 HC + 1 mixer circuit", "6": "1 HC + 1 mixer circuit + DHW",
+        "7": "2 mixer circuits", "8": "2 mixer circuits + DHW",
+        "9": "1 HC + 2 mixer circuits", "10": "1 HC + 2 mixer circuits + DHW",
+        "11": "External control",
+    },
+    6524: {"0": "Present", "1": "Not present"},
+    # -- Heat pump select entities ---------------------------------------------
+    6976: {
+        "0": "None", "1": "Vitosolic 100", "2": "Vitosolic 200",
+        "3": "Solar module SM1", "4": "Internal solar control",
+    },
+    7373: {
+        "0": "Off", "1": "DHW only", "2": "Heating/Cooling + DHW",
+        "4": "Continuous reduced", "5": "Continuous normal",
+        "6": "Normal off", "7": "Cooling only",
     },
 }
 
@@ -315,27 +428,120 @@ del _id, _name, _enabled, _cat, _merged
 
 
 # ============================================================================
+# Climate action resolvers
+# ============================================================================
+# Each function maps (requested_mode, current_mode, burner_state) raw strings
+# to an HVACAction.  Co-located with the enum maps that define the raw values.
+
+
+def _boiler_action(
+    requested: str | None,
+    current_mode: str | None,
+    burner: str | None,
+) -> HVACAction | None:
+    """Resolve HVAC action for boiler / fuel cell devices.
+
+    Raw values — see enum maps for attrs 92 and 708:
+      requested "1" = DHW only,  current_mode "0" = Standby
+    """
+    # DHW-only: burner fires for hot water
+    if requested == "1":
+        return HVACAction.DRYING if burner == "1" else HVACAction.IDLE
+    # Standby
+    if current_mode == "0":
+        return HVACAction.OFF
+    # Normal operation
+    if burner == "1":
+        return HVACAction.HEATING
+    if burner is not None:
+        return HVACAction.IDLE
+    return None
+
+
+def _heat_pump_action(
+    requested: str | None,
+    current_mode: str | None,
+    burner: str | None,
+) -> HVACAction | None:
+    """Resolve HVAC action for heat pump devices.
+
+    Raw values — see enum maps for attrs 7373 and 8537:
+      requested "1" = DHW only,  "7" = Cooling only
+      current_mode "0" = Standby
+    """
+    # DHW-only: compressor fires for hot water
+    if requested == "1":
+        return HVACAction.DRYING if burner == "1" else HVACAction.IDLE
+    # Standby
+    if current_mode == "0":
+        return HVACAction.OFF
+    # Cooling-only: compressor runs for cooling
+    if requested == "7":
+        if burner == "1":
+            return HVACAction.COOLING
+        if burner is not None:
+            return HVACAction.IDLE
+        return None
+    # Normal operation (heating modes)
+    if burner == "1":
+        return HVACAction.HEATING
+    if burner is not None:
+        return HVACAction.IDLE
+    return None
+
+
+# ============================================================================
 # Climate configuration
 # ============================================================================
 
-CLIMATE_CONFIG = ClimateMeta(
-    current_temp_attr=5367,     # Indoor temperature
-    target_temp_attr=82,        # Room temperature setpoint (RW)
-    operating_mode_attr=92,     # Operating mode (RW, enum 0-4)
-    current_mode_attr=708,      # Current operating mode (RO) {"0": "Standby", "1": "Reduced", "2": "Normal", "3": "Continuous normal"},
-    burner_state_attr=600,      # Burner state (RO)
-    eco_mode_attr=7852,         # Energy saving mode (RW)
-    party_mode_attr=7855,       # Party mode (RW)
-    hvac_to_vitotrol={
-        HVACMode.OFF: "0",         # Abschalt
-        HVACMode.DRY: "1",         # Nur WW (DHW only)
-        HVACMode.AUTO: "2",        # Heizen + WW (schedule-driven)
-    },
-    vitotrol_to_hvac={
-        "0": HVACMode.OFF,         # Abschalt
-        "1": HVACMode.DRY,         # Nur WW (DHW only)
-        "2": HVACMode.AUTO,        # Heizen + WW
-        "3": HVACMode.AUTO,        # Dauernd Reduziert (still heating)
-        "4": HVACMode.AUTO,        # Dauernd Normal (still heating)
-    },
-)
+CLIMATE_CONFIGS: list[ClimateMeta] = [
+    # Boilers (Vitodens, Vitovalor, etc.)
+    ClimateMeta(
+        current_temp_attr=5367,     # Indoor temperature
+        target_temp_attr=82,        # Room temperature setpoint (RW)
+        operating_mode_attr=92,     # Operating mode (RW, enum 0-4)
+        resolve_action=_boiler_action,
+        current_mode_attr=708,      # Current operating mode (RO)
+        burner_state_attr=600,      # Burner state (RO)
+        eco_mode_attr=7852,         # Energy saving mode (RW)
+        party_mode_attr=7855,       # Party mode (RW)
+        hvac_to_vitotrol={
+            HVACMode.OFF: "0",         # Abschalt
+            HVACMode.DRY: "1",         # Nur WW (DHW only)
+            HVACMode.AUTO: "2",        # Heizen + WW (schedule-driven)
+        },
+        vitotrol_to_hvac={
+            "0": HVACMode.OFF,         # Abschalt
+            "1": HVACMode.DRY,         # Nur WW (DHW only)
+            "2": HVACMode.AUTO,        # Heizen + WW
+            "3": HVACMode.AUTO,        # Dauernd Reduziert (still heating)
+            "4": HVACMode.AUTO,        # Dauernd Normal (still heating)
+        },
+    ),
+    # Heat pumps (VT 200, Vitocal, etc.)
+    ClimateMeta(
+        current_temp_attr=7299,     # Indoor temperature (temp_rts_r)
+        target_temp_attr=6369,      # Room temperature setpoint (RW)
+        operating_mode_attr=7373,   # Operating mode (RW, enum)
+        resolve_action=_heat_pump_action,
+        current_mode_attr=8537,     # Current operating mode (RO)
+        burner_state_attr=6710,     # Compressor state (RO)
+        eco_mode_attr=8062,         # Energy saving mode (RW)
+        party_mode_attr=8059,       # Party mode (RW)
+        hvac_to_vitotrol={
+            HVACMode.OFF: "0",         # Abschaltbetrieb
+            HVACMode.DRY: "1",         # Nur WW (DHW only)
+            HVACMode.AUTO: "2",        # Heizen/Kühlen/WW (schedule-driven)
+            HVACMode.COOL: "7",        # Nur Kühlen (Cooling only)
+        },
+        vitotrol_to_hvac={
+            "0": HVACMode.OFF,         # Abschaltbetrieb
+            "1": HVACMode.DRY,         # Nur WW (DHW only)
+            "2": HVACMode.AUTO,        # Heizen/Kühlen/WW
+            "4": HVACMode.AUTO,        # Dauernd Reduziert (still heating)
+            "5": HVACMode.AUTO,        # Dauernd Normal (still heating)
+            "6": HVACMode.OFF,         # Normal Abschalt (scheduled off)
+            "7": HVACMode.COOL,        # Nur Kühlen (Cooling only)
+        },
+    ),
+]
