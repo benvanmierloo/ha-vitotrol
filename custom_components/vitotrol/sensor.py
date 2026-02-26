@@ -16,7 +16,7 @@ from . import VitotrolConfigEntry
 from .api import AttributeTypeInfo, VitotrolDevice
 from .attributes import ATTRIBUTE_REGISTRY, AttrMeta
 from .coordinator import VitotrolCoordinator
-from .entity import VitotrolEntity
+from .entity import VitotrolEntity, infer_unknown_metadata
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,8 +42,8 @@ async def async_setup_entry(
                     continue
                 entities.append(VitotrolSensor(coordinator, device, info, meta))
             else:
-                # Unknown attr: auto-route RO to sensor
-                if not info.readable or info.writable:
+                inferred = infer_unknown_metadata(info)
+                if inferred.platform != "sensor":
                     continue
                 entities.append(VitotrolSensor(coordinator, device, info, meta=None))
 
@@ -78,17 +78,19 @@ class VitotrolSensor(VitotrolEntity, SensorEntity):
                 self._attr_device_class = SensorDeviceClass.ENUM
                 self._attr_options = list(meta.enum_map.values())
         else:
-            # Unknown attribute — fallback to API metadata
-            self._attr_name = info.name
+            inferred = infer_unknown_metadata(info)
+            self._attr_name = inferred.display_name
             self._attr_entity_registry_enabled_default = False
             if info.enum_values is not None:
                 enum_map = {str(k): v for k, v in info.enum_values.items()}
                 self._enum_values = enum_map
                 self._attr_device_class = SensorDeviceClass.ENUM
                 self._attr_options = list(enum_map.values())
-            elif info.unit:
-                self._attr_native_unit_of_measurement = info.unit
-                self._attr_state_class = SensorStateClass.MEASUREMENT
+            else:
+                self._attr_device_class = inferred.device_class
+                self._attr_state_class = inferred.state_class
+                self._attr_native_unit_of_measurement = inferred.unit
+                self._attr_suggested_display_precision = inferred.suggested_precision
 
     @property
     def available(self) -> bool:

@@ -5,10 +5,13 @@ Logs in, discovers devices, calls GetTypeInfo, and prints all available
 attributes with their metadata (unit, type, min/max, RW flags, enums).
 
 With --values, also fetches current cached values via GetData.
+With --raw-xml, dumps the raw GetTypeInfo XML for offline analysis.
+With --json, outputs structured JSON instead of a table.
 
 Usage:
     python scripts/discover.py --user YOUR_EMAIL --password YOUR_PASSWORD
     python scripts/discover.py --user YOUR_EMAIL --password YOUR_PASSWORD --values
+    python scripts/discover.py --user YOUR_EMAIL --password YOUR_PASSWORD --json > dump.json
 
 Or set environment variables:
     VITOTROL_USER=... VITOTROL_PASSWORD=... python scripts/discover.py --values
@@ -18,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
 import re
 import sys
@@ -152,12 +156,20 @@ async def get_data(
     return all_values
 
 
-async def run(username: str, password: str, *, fetch_values: bool = False) -> None:
+async def run(
+    username: str,
+    password: str,
+    *,
+    fetch_values: bool = False,
+    output_json: bool = False,
+    dump_raw_xml: bool = False,
+) -> None:
     cookies: dict[str, str] = {}
+    json_output: list[dict] = []
 
     async with aiohttp.ClientSession() as session:
         # Login
-        print("Logging in...")
+        print("Logging in...", file=sys.stderr)
         await soap_request(
             session,
             cookies,
@@ -173,10 +185,10 @@ async def run(username: str, password: str, *, fetch_values: bool = False) -> No
             ),
             store_cookies=True,
         )
-        print("Login OK\n")
+        print("Login OK\n", file=sys.stderr)
 
         # Discover devices
-        print("Discovering devices...")
+        print("Discovering devices...", file=sys.stderr)
         dev_root = await soap_request(session, cookies, "GetDevices", "<GetDevices />")
 
         devices = []
@@ -190,19 +202,20 @@ async def run(username: str, password: str, *, fetch_values: bool = False) -> No
                 devices.append((loc_id, loc_name, dev_id, dev_name, connected))
 
         if not devices:
-            print("No devices found!")
+            print("No devices found!", file=sys.stderr)
             return
 
         for loc_id, loc_name, dev_id, dev_name, connected in devices:
-            print(f"  Location: {loc_name} (ID={loc_id})")
-            print(f"  Device:   {dev_name} (ID={dev_id}, connected={connected})")
-            print()
+            print(f"  Location: {loc_name} (ID={loc_id})", file=sys.stderr)
+            print(f"  Device:   {dev_name} (ID={dev_id}, connected={connected})", file=sys.stderr)
+            print(file=sys.stderr)
 
         # GetTypeInfo for each device
         for loc_id, loc_name, dev_id, dev_name, _ in devices:
-            print(f"{'='*80}")
-            print(f"GetTypeInfo for {dev_name} (device={dev_id}, location={loc_id})")
-            print(f"{'='*80}\n")
+            if not output_json:
+                print(f"{'='*80}")
+                print(f"GetTypeInfo for {dev_name} (device={dev_id}, location={loc_id})")
+                print(f"{'='*80}\n")
 
             type_root = await soap_request(
                 session,
@@ -215,6 +228,16 @@ async def run(username: str, password: str, *, fetch_values: bool = False) -> No
                     "</GetTypeInfo>"
                 ),
             )
+
+            # Optionally dump raw XML
+            if dump_raw_xml:
+                type_info_list = type_root.find(".//TypeInfoListe")
+                target = type_info_list if type_info_list is not None else type_root
+                raw_xml = ElementTree.tostring(target, encoding="unicode")
+                xml_file = f"typeinfo_{dev_id}.xml"
+                with open(xml_file, "w") as f:
+                    f.write(raw_xml)
+                print(f"  Raw XML dumped to {xml_file}", file=sys.stderr)
 
             # Collect all entries
             base_entries: dict[int, dict] = {}
@@ -236,6 +259,7 @@ async def run(username: str, password: str, *, fetch_values: bool = False) -> No
                     "id": attr_id,
                     "name": _find_text_opt(dp, "DatenpunktName") or "",
                     "type": _find_text_opt(dp, "DatenpunktTyp") or "",
+                    "type_value": _find_text_opt(dp, "DatenpunktTypWert") or "",
                     "min": _find_text_opt(dp, "MinimalWert") or "",
                     "max": _find_text_opt(dp, "MaximalWert") or "",
                     "unit": _find_text_opt(dp, "EinheitBezeichnung") or "",
@@ -258,20 +282,56 @@ async def run(username: str, password: str, *, fetch_values: bool = False) -> No
                     aid for aid, e in base_entries.items()
                     if e["readable"] and e["type"] not in ("CircuitTime",)
                 ]
-                print(f"Fetching values for {len(readable_ids)} readable attributes...")
+                print(f"Fetching values for {len(readable_ids)} readable attributes...", file=sys.stderr)
                 values = await get_data(session, cookies, loc_id, dev_id, readable_ids)
-                print(f"Got {len(values)} values\n")
+                print(f"Got {len(values)} values\n", file=sys.stderr)
 
-            # Collect unique units for summary
+            # JSON output mode
+            if output_json:
+                device_data = {
+                    "device_name": dev_name,
+                    "device_id": dev_id,
+                    "location_name": loc_name,
+                    "location_id": loc_id,
+                    "attributes": {},
+                }
+                for attr_id in sorted(base_entries):
+                    e = base_entries[attr_id]
+                    entry: dict = {
+                        "name": e["name"],
+                        "type": e["type"],
+                        "type_value": e["type_value"],
+                        "min": e["min"],
+                        "max": e["max"],
+                        "unit": e["unit"],
+                        "group": e["group"],
+                        "heating_circuit_id": e["hc_id"],
+                        "factory_default": e["default"],
+                        "readable": e["readable"],
+                        "writable": e["writable"],
+                    }
+                    if "enums" in e:
+                        entry["enum_values"] = {
+                            str(k): v for k, v in sorted(e["enums"].items())
+                        }
+                    if attr_id in values:
+                        entry["current_value"] = values[attr_id]
+                    device_data["attributes"][str(attr_id)] = entry
+                json_output.append(device_data)
+                continue
+
+            # Collect unique units and type mappings for summary
             units: set[str] = set()
+            type_mapping: dict[str, set[str]] = {}  # type_value -> {type_str, ...}
+            groups: set[str] = set()
 
             # Print table
             val_header = " Value" + " " * 15 if fetch_values else ""
             print(
-                f"{'ID':>6}  {'Name':<40} {'Type':<12} {'Unit':<8} "
-                f"{'Min':<10} {'Max':<10} {'RO/RW':<5}{val_header}"
+                f"{'ID':>6}  {'Name':<40} {'Type':<12} {'TV':>3} {'Unit':<8} "
+                f"{'Min':<10} {'Max':<10} {'RO/RW':<5} {'HC':>2} {'Group':<16} {'Default':<10}{val_header}"
             )
-            print("-" * (100 + (20 if fetch_values else 0)))
+            print("-" * (130 + (20 if fetch_values else 0)))
 
             for attr_id in sorted(base_entries):
                 e = base_entries[attr_id]
@@ -283,14 +343,18 @@ async def run(username: str, password: str, *, fetch_values: bool = False) -> No
 
                 if e["unit"]:
                     units.add(e["unit"])
+                if e["group"]:
+                    groups.add(e["group"])
+                if e["type_value"]:
+                    type_mapping.setdefault(e["type_value"], set()).add(e["type"])
 
                 val_col = ""
                 if fetch_values and attr_id in values:
                     val_col = f" {values[attr_id]}"
 
                 print(
-                    f"{e['id']:>6}  {e['name']:<40} {e['type']:<12} {e['unit']:<8} "
-                    f"{e['min']:<10} {e['max']:<10} {rw:<5}{val_col}"
+                    f"{e['id']:>6}  {e['name']:<40} {e['type']:<12} {e['type_value']:>3} {e['unit']:<8} "
+                    f"{e['min']:<10} {e['max']:<10} {rw:<5} {e['hc_id']:>2} {e['group']:<16} {e['default']:<10}{val_col}"
                 )
 
                 if "enums" in e:
@@ -301,27 +365,78 @@ async def run(username: str, password: str, *, fetch_values: bool = False) -> No
             if fetch_values:
                 print(f"Values retrieved: {len(values)}")
 
+            # Type value mapping summary
+            if type_mapping:
+                print(f"\nDatenpunktTypWert -> DatenpunktTyp mapping:")
+                for tv in sorted(type_mapping, key=lambda x: int(x) if x.isdigit() else 999):
+                    types = ", ".join(sorted(type_mapping[tv]))
+                    count = sum(
+                        1 for e in base_entries.values() if e["type_value"] == tv
+                    )
+                    print(f"  {tv:>3} -> {types} ({count} attrs)")
+
             # Unit summary
             if units:
-                print(f"\nUnique units found: {sorted(units)}")
-            else:
-                print("\nNo units returned by API (EinheitBezeichnung empty for all attributes)")
+                print(f"\nUnique units: {sorted(units)}")
+
+            # Group summary
+            if groups:
+                print(f"\nUnique groups: {sorted(groups)}")
 
             print()
 
+        # Final JSON output
+        if output_json:
+            print(json.dumps(json_output, indent=2, ensure_ascii=False))
+
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Vitotrol device discovery")
-    parser.add_argument("--user", default=os.environ.get("VITOTROL_USER"), help="Vitotrol username (or VITOTROL_USER env)")
-    parser.add_argument("--password", default=os.environ.get("VITOTROL_PASSWORD"), help="Vitotrol password (or VITOTROL_PASSWORD env)")
-    parser.add_argument("--values", action="store_true", help="Also fetch current cached values via GetData")
+    parser = argparse.ArgumentParser(
+        description="Vitotrol device discovery — scan the SOAP API for all attributes"
+    )
+    parser.add_argument(
+        "--user",
+        default=os.environ.get("VITOTROL_USER"),
+        help="Vitotrol username (or VITOTROL_USER env)",
+    )
+    parser.add_argument(
+        "--password",
+        default=os.environ.get("VITOTROL_PASSWORD"),
+        help="Vitotrol password (or VITOTROL_PASSWORD env)",
+    )
+    parser.add_argument(
+        "--values",
+        action="store_true",
+        help="Also fetch current cached values via GetData",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output structured JSON (pipe to file with > dump.json)",
+    )
+    parser.add_argument(
+        "--raw-xml",
+        action="store_true",
+        help="Dump raw GetTypeInfo XML per device to typeinfo_<id>.xml",
+    )
     args = parser.parse_args()
 
     if not args.user or not args.password:
-        print("Error: provide --user/--password or set VITOTROL_USER/VITOTROL_PASSWORD env vars", file=sys.stderr)
+        print(
+            "Error: provide --user/--password or set VITOTROL_USER/VITOTROL_PASSWORD env vars",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
-    asyncio.run(run(args.user, args.password, fetch_values=args.values))
+    asyncio.run(
+        run(
+            args.user,
+            args.password,
+            fetch_values=args.values,
+            output_json=args.json,
+            dump_raw_xml=args.raw_xml,
+        )
+    )
 
 
 if __name__ == "__main__":

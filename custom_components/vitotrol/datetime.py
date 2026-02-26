@@ -1,8 +1,11 @@
-"""Select platform for the Viessmann Vitotrol integration."""
+"""Datetime platform for the Viessmann Vitotrol integration."""
 
 from __future__ import annotations
 
-from homeassistant.components.select import SelectEntity
+import logging
+from datetime import datetime, timezone
+
+from homeassistant.components.datetime import DateTimeEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -12,16 +15,37 @@ from .attributes import ATTRIBUTE_REGISTRY, AttrMeta
 from .coordinator import VitotrolCoordinator
 from .entity import VitotrolEntity, infer_unknown_metadata
 
+_LOGGER = logging.getLogger(__name__)
+
+# API date/time string formats, tried in order
+_PARSE_FORMATS = (
+    "%Y-%m-%d %H:%M:%S",
+    "%d.%m.%Y",
+)
+_WRITE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+def _parse_api_datetime(raw: str) -> datetime | None:
+    """Parse an API date string into an aware UTC datetime."""
+    for fmt in _PARSE_FORMATS:
+        try:
+            naive = datetime.strptime(raw.strip(), fmt)
+            return naive.replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    _LOGGER.debug("Cannot parse datetime string %r", raw)
+    return None
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: VitotrolConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Vitotrol select entities for writable enum attributes."""
+    """Set up Vitotrol datetime entities."""
     runtime = entry.runtime_data
     coordinator = runtime.coordinator
-    entities: list[SelectEntity] = []
+    entities: list[DateTimeEntity] = []
 
     for device in coordinator.devices:
         catalog = coordinator.get_attribute_catalog(device.device_id)
@@ -30,20 +54,20 @@ async def async_setup_entry(
             meta = ATTRIBUTE_REGISTRY.get(attr_id)
 
             if meta is not None:
-                if meta.platform != "select":
+                if meta.platform != "datetime":
                     continue
-                entities.append(VitotrolSelect(coordinator, device, info, meta))
+                entities.append(VitotrolDateTime(coordinator, device, info, meta))
             else:
                 inferred = infer_unknown_metadata(info)
-                if inferred.platform != "select":
+                if inferred.platform != "datetime":
                     continue
-                entities.append(VitotrolSelect(coordinator, device, info, meta=None))
+                entities.append(VitotrolDateTime(coordinator, device, info, meta=None))
 
     async_add_entities(entities)
 
 
-class VitotrolSelect(VitotrolEntity, SelectEntity):
-    """Select entity for a writable enum attribute."""
+class VitotrolDateTime(VitotrolEntity, DateTimeEntity):
+    """Datetime entity for a Vitotrol date attribute."""
 
     def __init__(
         self,
@@ -56,27 +80,13 @@ class VitotrolSelect(VitotrolEntity, SelectEntity):
         super().__init__(coordinator, device, key)
         self._vitotrol_attr_id = info.attr_id
 
-        if meta is not None and meta.enum_map is not None:
+        if meta is not None:
             self._attr_name = meta.name
             self._attr_entity_registry_enabled_default = meta.enabled_by_default
-            self._value_to_label = meta.enum_map
         else:
-            # Fallback: use German labels from GetTypeInfo
-            if meta is None:
-                inferred = infer_unknown_metadata(info)
-                self._attr_name = inferred.display_name
-                self._attr_entity_registry_enabled_default = False
-            else:
-                self._attr_name = meta.name
-                self._attr_entity_registry_enabled_default = meta.enabled_by_default
-            self._value_to_label = (
-                {str(k): v for k, v in info.enum_values.items()}
-                if info.enum_values
-                else {}
-            )
-
-        self._label_to_value = {v: k for k, v in self._value_to_label.items()}
-        self._attr_options = list(self._value_to_label.values())
+            inferred = infer_unknown_metadata(info)
+            self._attr_name = inferred.display_name
+            self._attr_entity_registry_enabled_default = False
 
     @property
     def available(self) -> bool:
@@ -84,21 +94,18 @@ class VitotrolSelect(VitotrolEntity, SelectEntity):
         return super().available and self._vitotrol_attr_id in self._device_data
 
     @property
-    def current_option(self) -> str | None:
-        """Return the currently selected option."""
+    def native_value(self) -> datetime | None:
+        """Return the current datetime value."""
         raw = self._get_attr_value(self._vitotrol_attr_id)
         if raw is None:
             return None
-        return self._value_to_label.get(raw)
+        return _parse_api_datetime(raw)
 
-    async def async_select_option(self, option: str) -> None:
-        """Set a new option."""
-        raw_value = self._label_to_value.get(option)
-        if raw_value is None:
-            return
-
+    async def async_set_value(self, value: datetime) -> None:
+        """Set a new datetime value."""
+        str_value = value.astimezone(timezone.utc).strftime(_WRITE_FORMAT)
         await self.coordinator.async_write(
-            self._device, self._vitotrol_attr_id, raw_value
+            self._device, self._vitotrol_attr_id, str_value
         )
-        self._update_coordinator_data(self._vitotrol_attr_id, raw_value)
+        self._update_coordinator_data(self._vitotrol_attr_id, str_value)
         self.async_write_ha_state()

@@ -10,7 +10,7 @@ from . import VitotrolConfigEntry
 from .api import AttributeTypeInfo, VitotrolDevice
 from .attributes import ATTRIBUTE_REGISTRY, AttrMeta
 from .coordinator import VitotrolCoordinator
-from .entity import VitotrolEntity
+from .entity import VitotrolEntity, infer_unknown_metadata
 
 
 async def async_setup_entry(
@@ -28,9 +28,16 @@ async def async_setup_entry(
 
         for attr_id, info in catalog.items():
             meta = ATTRIBUTE_REGISTRY.get(attr_id)
-            if meta is None or meta.platform != "binary_sensor":
-                continue
-            entities.append(VitotrolBinarySensor(coordinator, device, info, meta))
+
+            if meta is not None:
+                if meta.platform != "binary_sensor":
+                    continue
+                entities.append(VitotrolBinarySensor(coordinator, device, info, meta))
+            else:
+                inferred = infer_unknown_metadata(info)
+                if inferred.platform != "binary_sensor":
+                    continue
+                entities.append(VitotrolBinarySensor(coordinator, device, info, meta=None))
 
     async_add_entities(entities)
 
@@ -43,15 +50,28 @@ class VitotrolBinarySensor(VitotrolEntity, BinarySensorEntity):
         coordinator: VitotrolCoordinator,
         device: VitotrolDevice,
         info: AttributeTypeInfo,
-        meta: AttrMeta,
+        meta: AttrMeta | None,
     ) -> None:
-        key = meta.name.lower().replace(" ", "_")
+        key = meta.name.lower().replace(" ", "_") if meta else f"attr_{info.attr_id}"
         super().__init__(coordinator, device, key)
         self._vitotrol_attr_id = info.attr_id
-        self._on_values = meta.on_values or ("1",)
-        self._attr_name = meta.name
-        self._attr_entity_registry_enabled_default = meta.enabled_by_default
-        self._attr_device_class = meta.device_class
+
+        if meta is not None:
+            self._on_values = meta.on_values or ("1",)
+            self._attr_name = meta.name
+            self._attr_entity_registry_enabled_default = meta.enabled_by_default
+            self._attr_device_class = meta.device_class
+        else:
+            inferred = infer_unknown_metadata(info)
+            self._attr_name = inferred.display_name
+            self._attr_entity_registry_enabled_default = False
+            # Find the raw key whose label is "Ein" (on)
+            on_keys = tuple(
+                str(k)
+                for k, v in (info.enum_values or {}).items()
+                if v.lower() == "ein"
+            )
+            self._on_values = on_keys if on_keys else ("1",)
 
     @property
     def available(self) -> bool:
