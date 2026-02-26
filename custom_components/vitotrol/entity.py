@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import VitotrolDevice
 from .const import DOMAIN
 from .coordinator import VitotrolCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class VitotrolEntity(CoordinatorEntity[VitotrolCoordinator]):

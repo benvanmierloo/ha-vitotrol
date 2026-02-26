@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -19,6 +20,8 @@ from .api import VitotrolDevice
 from .attributes import CLIMATE_CONFIG
 from .coordinator import VitotrolCoordinator
 from .entity import VitotrolEntity
+
+_LOGGER = logging.getLogger(__name__)
 
 PRESET_NONE = "none"
 PRESET_ECO = "eco"
@@ -116,6 +119,12 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
         try:
             return float(raw)
         except ValueError:
+            _LOGGER.debug(
+                "Climate %s: cannot parse current_temp (attr %d) %r as float",
+                self._device.device_name,
+                self._cfg.current_temp_attr,
+                raw,
+            )
             return None
 
     @property
@@ -127,6 +136,12 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
         try:
             return float(raw)
         except ValueError:
+            _LOGGER.debug(
+                "Climate %s: cannot parse target_temp (attr %d) %r as float",
+                self._device.device_name,
+                self._cfg.target_temp_attr,
+                raw,
+            )
             return None
 
     @property
