@@ -1,10 +1,11 @@
-"""Number platform for the Viessmann Vitotrol integration."""
+"""Datetime platform for the Viessmann Vitotrol integration."""
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
-from homeassistant.components.number import NumberEntity, NumberMode
+from homeassistant.components.datetime import DateTimeEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -12,9 +13,28 @@ from . import VitotrolConfigEntry
 from .api import AttributeTypeInfo, VitotrolDevice
 from .attributes import ATTRIBUTE_REGISTRY, AttrMeta
 from .coordinator import VitotrolCoordinator
-from .entity import VitotrolEntity, entity_key_for_attr, infer_unknown_metadata
+from .entity import VitotrolEntity, infer_unknown_metadata
 
 _LOGGER = logging.getLogger(__name__)
+
+# API date/time string formats, tried in order
+_PARSE_FORMATS = (
+    "%Y-%m-%d %H:%M:%S",
+    "%d.%m.%Y",
+)
+_WRITE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+def _parse_api_datetime(raw: str) -> datetime | None:
+    """Parse an API date string into an aware UTC datetime."""
+    for fmt in _PARSE_FORMATS:
+        try:
+            naive = datetime.strptime(raw.strip(), fmt)
+            return naive.replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    _LOGGER.debug("Cannot parse datetime string %r", raw)
+    return None
 
 
 async def async_setup_entry(
@@ -22,10 +42,10 @@ async def async_setup_entry(
     entry: VitotrolConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Vitotrol number entities."""
+    """Set up Vitotrol datetime entities."""
     runtime = entry.runtime_data
     coordinator = runtime.coordinator
-    entities: list[NumberEntity] = []
+    entities: list[DateTimeEntity] = []
 
     for device in coordinator.devices:
         catalog = coordinator.get_attribute_catalog(device.device_id)
@@ -34,23 +54,20 @@ async def async_setup_entry(
             meta = ATTRIBUTE_REGISTRY.get(attr_id)
 
             if meta is not None:
-                if meta.platform != "number":
+                if meta.platform != "datetime":
                     continue
-                entities.append(VitotrolNumber(coordinator, device, info, meta))
+                entities.append(VitotrolDateTime(coordinator, device, info, meta))
             else:
                 inferred = infer_unknown_metadata(info)
-                if inferred.platform != "number":
+                if inferred.platform != "datetime":
                     continue
-                entities.append(VitotrolNumber(coordinator, device, info, meta=None))
+                entities.append(VitotrolDateTime(coordinator, device, info, meta=None))
 
     async_add_entities(entities)
 
 
-class VitotrolNumber(VitotrolEntity, NumberEntity):
-    """Number entity for a writable Vitotrol attribute."""
-
-    _attr_mode = NumberMode.BOX
-    _attr_suggested_display_precision = 0
+class VitotrolDateTime(VitotrolEntity, DateTimeEntity):
+    """Datetime entity for a Vitotrol date attribute."""
 
     def __init__(
         self,
@@ -59,33 +76,17 @@ class VitotrolNumber(VitotrolEntity, NumberEntity):
         info: AttributeTypeInfo,
         meta: AttrMeta | None,
     ) -> None:
-        key = entity_key_for_attr(info.attr_id, meta)
+        key = meta.name.lower().replace(" ", "_") if meta else f"attr_{info.attr_id}"
         super().__init__(coordinator, device, key)
         self._vitotrol_attr_id = info.attr_id
 
         if meta is not None:
             self._attr_name = meta.name
             self._attr_entity_registry_enabled_default = meta.enabled_by_default
-            self._attr_native_unit_of_measurement = meta.unit
-            self._attr_device_class = meta.device_class
-            self._attr_entity_category = meta.entity_category
         else:
             inferred = infer_unknown_metadata(info)
             self._attr_name = inferred.display_name
             self._attr_entity_registry_enabled_default = False
-
-        # Min/max from API metadata
-        try:
-            self._attr_native_min_value = float(info.min_value)
-        except (ValueError, TypeError):
-            pass
-        try:
-            self._attr_native_max_value = float(info.max_value)
-        except (ValueError, TypeError):
-            pass
-
-        # The API only accepts whole numbers for writable attributes.
-        self._attr_native_step = 1.0
 
     @property
     def available(self) -> bool:
@@ -93,25 +94,16 @@ class VitotrolNumber(VitotrolEntity, NumberEntity):
         return super().available and self._vitotrol_attr_id in self._device_data
 
     @property
-    def native_value(self) -> int | None:
-        """Return the current value."""
+    def native_value(self) -> datetime | None:
+        """Return the current datetime value."""
         raw = self._get_attr_value(self._vitotrol_attr_id)
         if raw is None:
             return None
-        try:
-            return int(float(raw))
-        except (ValueError, OverflowError):
-            _LOGGER.debug(
-                "Number %s (attr %d): cannot parse %r as number",
-                self._attr_name,
-                self._vitotrol_attr_id,
-                raw,
-            )
-            return None
+        return _parse_api_datetime(raw)
 
-    async def async_set_native_value(self, value: float) -> None:
-        """Set a new value."""
-        str_value = str(int(value))
+    async def async_set_value(self, value: datetime) -> None:
+        """Set a new datetime value."""
+        str_value = value.astimezone(timezone.utc).strftime(_WRITE_FORMAT)
         await self.coordinator.async_write(
             self._device, self._vitotrol_attr_id, str_value
         )
