@@ -159,9 +159,9 @@ _TABLE: list[tuple[int, str, bool, str]] = [
 
     # ---- Enum status sensors (see _ENUM_MAPS) ------------------------------
     (708,   "Current operating mode",            True,   "enum"),
-    (76,    "Party mode status",                 False,  "enum"),
-    (88,    "Energy saving status",              False,  "enum"),
-    (270,   "External mode switch",              False,  "enum"),
+    (76,    "Party mode status",                 False,  "bool"),
+    (88,    "Energy saving status",              False,  "bool"),
+    (270,   "External mode switch",              False,  "bool"),
     (7987,  "Heating circuit 1 type",            False,  "enum"),
     (10761, "Hot water sensor status",           False,  "enum"),
     (12526, "Fuel cell maintenance status",      False,  "enum"),
@@ -309,9 +309,6 @@ _TABLE: list[tuple[int, str, bool, str]] = [
 _ENUM_MAPS: dict[int, dict[str, str]] = {
     # -- Enum status sensors --------------------------------------------------
     708:   {"0": "Standby", "1": "Reduced", "2": "Normal", "3": "Continuous normal"},
-    76:    {"0": "Off", "1": "On"},
-    88:    {"0": "Off", "1": "On"},
-    270:   {"0": "Off", "1": "On"},
     7987:  {"0": "Not present", "1": "Direct circuit", "2": "Mixer circuit"},
     10761: {
         "0": "OK", "1": "Short circuit", "2": "Open circuit",
