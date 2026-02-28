@@ -94,9 +94,10 @@ _CATEGORIES: dict[str, dict] = {
     # -- Number categories ---------------------------------------------------
     "num_temp":   dict(platform="number", unit=UnitOfTemperature.CELSIUS, device_class=NumberDeviceClass.TEMPERATURE, entity_category=EntityCategory.CONFIG),
     "num":        dict(platform="number", entity_category=EntityCategory.CONFIG),
-    # -- Switch / select / none ----------------------------------------------
+    # -- Switch / select / datetime / none -----------------------------------
     "switch":     dict(platform="switch"),
     "select":     dict(platform="select"),
+    "date":       dict(platform="sensor"),
     "none":       dict(),
 }
 
@@ -201,9 +202,9 @@ _TABLE: list[tuple[int, str, bool, str]] = [
     # ---- No standalone entity (used by climate / not parseable) -------------
     (92,    "Operating mode",                    False,  "select"),  # also used by climate
     (82,    "Room temperature setpoint",         False,  "none"),  # climate RW
-    (5385,  "Device date/time",                  False,  "none"),
-    (306,   "Holiday start date",                False,  "none"),
-    (309,   "Holiday end date",                  False,  "none"),
+    (5385,  "Device date/time",                  False,  "date"),
+    (306,   "Holiday start date",                False,  "date"),
+    (309,   "Holiday end date",                  False,  "date"),
     (7191,  "Heating schedule",                  False,  "none"),
     (7192,  "Hot water schedule",                False,  "none"),
     (7193,  "Circulation schedule",              False,  "none"),

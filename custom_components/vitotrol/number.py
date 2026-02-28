@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
-from homeassistant.const import UnitOfTemperature
+from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -13,7 +12,7 @@ from . import VitotrolConfigEntry
 from .api import AttributeTypeInfo, VitotrolDevice
 from .attributes import ATTRIBUTE_REGISTRY, AttrMeta
 from .coordinator import VitotrolCoordinator
-from .entity import VitotrolEntity, entity_key_for_attr
+from .entity import VitotrolEntity, entity_key_for_attr, infer_unknown_metadata
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,10 +38,8 @@ async def async_setup_entry(
                     continue
                 entities.append(VitotrolNumber(coordinator, device, info, meta))
             else:
-                # Unknown attr: auto-route RW numeric non-enum to number
-                if not info.writable or not info.readable:
-                    continue
-                if info.enum_values is not None:
+                inferred = infer_unknown_metadata(info)
+                if inferred.platform != "number":
                     continue
                 entities.append(VitotrolNumber(coordinator, device, info, meta=None))
 
@@ -73,13 +70,9 @@ class VitotrolNumber(VitotrolEntity, NumberEntity):
             self._attr_device_class = meta.device_class
             self._attr_entity_category = meta.entity_category
         else:
-            self._attr_name = info.name
+            inferred = infer_unknown_metadata(info)
+            self._attr_name = inferred.display_name
             self._attr_entity_registry_enabled_default = False
-            if info.unit == "\u00b0C":
-                self._attr_device_class = NumberDeviceClass.TEMPERATURE
-                self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
-            elif info.unit:
-                self._attr_native_unit_of_measurement = info.unit
 
         # Min/max from API metadata
         try:

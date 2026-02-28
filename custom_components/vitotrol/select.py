@@ -10,7 +10,7 @@ from . import VitotrolConfigEntry
 from .api import AttributeTypeInfo, VitotrolDevice
 from .attributes import ATTRIBUTE_REGISTRY, AttrMeta
 from .coordinator import VitotrolCoordinator
-from .entity import VitotrolEntity, entity_key_for_attr
+from .entity import VitotrolEntity, entity_key_for_attr, infer_unknown_metadata
 
 
 async def async_setup_entry(
@@ -34,10 +34,8 @@ async def async_setup_entry(
                     continue
                 entities.append(VitotrolSelect(coordinator, device, info, meta))
             else:
-                # Unknown attr: auto-route RW enum to select
-                if not info.writable or not info.readable:
-                    continue
-                if info.enum_values is None:
+                inferred = infer_unknown_metadata(info)
+                if inferred.platform != "select":
                     continue
                 entities.append(VitotrolSelect(coordinator, device, info, meta=None))
 
@@ -64,10 +62,13 @@ class VitotrolSelect(VitotrolEntity, SelectEntity):
             self._value_to_label = meta.enum_map
         else:
             # Fallback: use German labels from GetTypeInfo
-            self._attr_name = info.name if meta is None else meta.name
-            self._attr_entity_registry_enabled_default = (
-                meta.enabled_by_default if meta else False
-            )
+            if meta is None:
+                inferred = infer_unknown_metadata(info)
+                self._attr_name = inferred.display_name
+                self._attr_entity_registry_enabled_default = False
+            else:
+                self._attr_name = meta.name
+                self._attr_entity_registry_enabled_default = meta.enabled_by_default
             self._value_to_label = (
                 {str(k): v for k, v in info.enum_values.items()}
                 if info.enum_values
