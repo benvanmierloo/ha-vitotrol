@@ -24,7 +24,7 @@ Coordinator data structure: `dict[int, dict[int, str]]` → `{device_id: {attr_i
 - **Namespace**: `http://www.e-controlnet.de/services/vii/`
 - **RefreshData is async and slow**: fire request → wait ~8s → poll `RequestRefreshStatus` → then `GetData`. Full cycle is 10–15s.
 - **WriteData is also async**: fire → wait ~4s → poll `RequestWriteStatus`. Timeout 60s.
-- **GetTypeInfo discovers all attributes**: `GetTypeInfo(AnlageId, GeraetId)` returns every datapoint the device supports in one fast call, with names, types, units, min/max, RO/RW flags, and enum values. Replaces binary-search discovery entirely.
+- **GetTypeInfo discovers all attributes**: `GetTypeInfo(AnlageId, GeraetId)` returns every datapoint the device supports in one fast call, with names, types, units, min/max, RO/RW flags, and enum values.
 - **Unsupported attributes crash the request**: requesting an attr the device doesn't support fails the entire SOAP call. GetTypeInfo tells us exactly which attrs are valid.
 - **Session lifetime is unknown**: the original Go code re-logins every loop. Our strategy: login once, re-login + retry on any API error.
 - All responses have a `<Ergebnis>` result code (0 = success) and `<ErgebnisText>` error message.
