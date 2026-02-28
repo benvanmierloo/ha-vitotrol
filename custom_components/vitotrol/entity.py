@@ -8,10 +8,22 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import VitotrolDevice
+from .attributes import AttrMeta
 from .const import DOMAIN
 from .coordinator import VitotrolCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def entity_key_for_attr(attr_id: int, meta: AttrMeta | None) -> str:
+    """Generate the entity key for an attribute.
+
+    Centralizes the key generation logic used by all platforms.
+    Known attrs use the lowercased name; unknown attrs use ``attr_{id}``.
+    """
+    if meta is not None:
+        return meta.name.lower().replace(" ", "_")
+    return f"attr_{attr_id}"
 
 
 class VitotrolEntity(CoordinatorEntity[VitotrolCoordinator]):

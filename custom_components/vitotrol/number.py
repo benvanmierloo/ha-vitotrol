@@ -13,7 +13,7 @@ from . import VitotrolConfigEntry
 from .api import AttributeTypeInfo, VitotrolDevice
 from .attributes import ATTRIBUTE_REGISTRY, AttrMeta
 from .coordinator import VitotrolCoordinator
-from .entity import VitotrolEntity
+from .entity import VitotrolEntity, entity_key_for_attr
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class VitotrolNumber(VitotrolEntity, NumberEntity):
         info: AttributeTypeInfo,
         meta: AttrMeta | None,
     ) -> None:
-        key = meta.name.lower().replace(" ", "_") if meta else f"attr_{info.attr_id}"
+        key = entity_key_for_attr(info.attr_id, meta)
         super().__init__(coordinator, device, key)
         self._vitotrol_attr_id = info.attr_id
 

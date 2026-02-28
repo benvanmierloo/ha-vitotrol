@@ -73,6 +73,77 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
             )
 
     # ------------------------------------------------------------------
+    # Pre-seed from entity registry (before first refresh)
+    # ------------------------------------------------------------------
+
+    def pre_seed_from_registry(
+        self, registry_entries: list,
+    ) -> None:
+        """Pre-populate entity attr registrations from the HA entity registry.
+
+        Called before the first data refresh so that the coordinator polls
+        the correct attributes immediately, rather than falling back to
+        only the enabled-by-default set.
+        """
+        from .attributes import CLIMATE_CONFIGS
+        from .entity import entity_key_for_attr
+
+        for device in self.devices:
+            did = device.device_id
+            catalog = self.get_attribute_catalog(did)
+            if not catalog:
+                continue
+
+            # Build unique_id → attr_ids mapping
+            uid_to_attrs: dict[str, set[int]] = {}
+
+            # Regular single-attr entities
+            for attr_id in catalog:
+                meta = ATTRIBUTE_REGISTRY.get(attr_id)
+                key = entity_key_for_attr(attr_id, meta)
+                uid_to_attrs[f"{did}_{key}"] = {attr_id}
+
+            # Climate entity (reads multiple attrs)
+            for config in CLIMATE_CONFIGS:
+                if config.operating_mode_attr not in catalog:
+                    continue
+                ids = {
+                    config.current_temp_attr,
+                    config.target_temp_attr,
+                    config.operating_mode_attr,
+                }
+                for opt in (
+                    config.current_mode_attr,
+                    config.burner_state_attr,
+                    config.eco_mode_attr,
+                    config.party_mode_attr,
+                ):
+                    if opt is not None:
+                        ids.add(opt)
+                uid_to_attrs[f"{did}_climate"] = ids
+                break  # only one climate config per device
+
+            # Match enabled registry entries to our mapping
+            seeded = 0
+            for reg_entry in registry_entries:
+                if reg_entry.disabled:
+                    continue
+                attr_ids = uid_to_attrs.get(reg_entry.unique_id)
+                if attr_ids is not None:
+                    self.register_entity_attrs(
+                        did, reg_entry.unique_id, attr_ids
+                    )
+                    seeded += 1
+
+            if seeded:
+                _LOGGER.debug(
+                    "Pre-seeded %d entity registrations for %s "
+                    "from entity registry",
+                    seeded,
+                    device.device_name,
+                )
+
+    # ------------------------------------------------------------------
     # Entity attr_id registration — only registered attrs get polled
     # ------------------------------------------------------------------
 
