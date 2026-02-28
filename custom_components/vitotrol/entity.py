@@ -54,11 +54,13 @@ def _is_binary_enum(info: AttributeTypeInfo) -> bool:
     if info.enum_values is None:
         return False
     labels = {str(v).lower() for v in info.enum_values.values()}
-    return labels <= {"aus", "ein"}
+    return bool(labels) and labels <= {"aus", "ein"}
 
 
-def _group_prefix(group: str) -> str:
+def _group_prefix(group: str | None) -> str:
     """Extract the subsystem suffix after '~' from a group string."""
+    if not group:
+        return ""
     if "~" in group:
         return group.split("~")[-1]
     return ""
