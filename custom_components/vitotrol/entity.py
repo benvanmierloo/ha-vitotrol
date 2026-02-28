@@ -102,7 +102,7 @@ def infer_unknown_metadata(info: AttributeTypeInfo) -> InferredMeta:
     t = info.type
 
     if t == "Date":
-        return InferredMeta(platform="datetime", display_name=display_name)
+        return InferredMeta(platform="sensor", display_name=display_name)
 
     if t == "CircuitTime":
         return InferredMeta(platform=None, display_name=display_name)

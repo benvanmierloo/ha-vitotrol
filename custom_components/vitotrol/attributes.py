@@ -97,7 +97,7 @@ _CATEGORIES: dict[str, dict] = {
     # -- Switch / select / datetime / none -----------------------------------
     "switch":     dict(platform="switch"),
     "select":     dict(platform="select"),
-    "date":       dict(platform="datetime"),
+    "date":       dict(platform="sensor"),
     "none":       dict(),
 }
 
