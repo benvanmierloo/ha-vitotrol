@@ -19,10 +19,10 @@
 │  │                      │  (SOAP client)      │  │   │
 │  │                      └──────────┬──────────┘  │   │
 │  │                                 │              │   │
-│  │  ┌────────┬────────┬───────┬────┴┬──────┐    │   │
-│  │  │ Sensor │ Binary │Climate│Swit-│Number│    │   │
-│  │  │        │ Sensor │       │ ch  │      │    │   │
-│  │  └────────┴────────┴───────┴─────┴──────┘    │   │
+│  │  ┌────────┬────────┬───────┬─────┬──────┬──────┐│   │
+│  │  │ Sensor │ Binary │Climate│Swit-│Number│Select││   │
+│  │  │        │ Sensor │       │ ch  │      │      ││   │
+│  │  └────────┴────────┴───────┴─────┴──────┴──────┘│   │
 │  └───────────────────────────────────────────────┘   │
 │                                                     │
 └──────────────────────────┬──────────────────────────┘
@@ -124,7 +124,7 @@ See [contributing.md](contributing.md#the-attribute-registry-attributespy) for t
 
 1. **At setup**, the coordinator calls `GetTypeInfo` — a single fast API call that returns every datapoint the device supports, with metadata (name, type, unit, min/max, read/write flags, enum values).
 2. **Known attributes** (in the registry) get entities with curated device classes, icons, and translations. Enabled by default.
-3. **Additional attributes** get entities with metadata inferred from the API response (unit → device class, writable + min/max → number, writable enum → select, etc.). Disabled by default.
+3. **Additional attributes** get entities with metadata inferred from the API response (unit → device class, writable + min/max → number, writable binary enum (ein/aus, aktiv/inaktiv) → switch, writable multi-value enum → select, etc.). Disabled by default.
 4. **Users enable what they want** via the standard HA UI ("X disabled entities" on the device page).
 5. **Only enabled entities get polled** — the coordinator builds the attribute ID list from the entity registry.
 

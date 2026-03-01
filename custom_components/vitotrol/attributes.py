@@ -125,6 +125,9 @@ _TABLE: list[tuple[int, str, bool, str]] = [
     (6052,  "Heating water outlet temperature",  True,   "temp"),
     (9786,  "Hot water tank top temperature",    False,  "temp"),
     (9787,  "Hot water tank bottom temperature", False,  "temp"),
+    (5376,  "Room temperature (sensor)",        False,  "temp"),
+    (5380,  "Hydraulic separator temperature",  False,  "temp"),
+    (6053,  "Supply temperature",               False,  "temp"),
 
     # ---- Power sensors ------------------------------------------------------
     (9783,  "Fuel cell electrical power",        False,   "power"),
@@ -208,6 +211,60 @@ _TABLE: list[tuple[int, str, bool, str]] = [
     (7191,  "Heating schedule",                  False,  "none"),
     (7192,  "Hot water schedule",                False,  "none"),
     (7193,  "Circulation schedule",              False,  "none"),
+
+    # ---- Solar sensors ---------------------------------------------------
+    (5272,  "Solar collector temperature",       False,  "temp"),
+    (5276,  "Solar storage temperature",         False,  "temp"),
+    (5277,  "Solar operating hours",             False,  "duration"),
+    (5279,  "Solar energy total",                False,  "energy"),
+    (7895,  "Solar yield current year",          False,  "energy_h"),
+    (7896,  "Solar yield year -1",               False,  "energy_h"),
+    (7897,  "Solar yield year -2",               False,  "energy_h"),
+    (7898,  "Solar yield year -3",               False,  "energy_h"),
+    (7899,  "Solar yield year -4",               False,  "energy_h"),
+    (7900,  "Solar yield year -5",               False,  "energy_h"),
+    (7901,  "Solar yield year -6",               False,  "energy_h"),
+    (7902,  "Solar yield year -7",               False,  "energy_h"),
+    (5273,  "Solar recharge",                    False,  "bool"),
+    (5274,  "Solar pump",                        False,  "running"),
+
+    # ---- Heating circuit 2 (HC2) -----------------------------------------
+    (709,   "Current operating mode HC2",        False,  "enum"),
+    (77,    "Party mode status HC2",             False,  "bool"),
+    (89,    "Energy saving status HC2",          False,  "bool"),
+    (271,   "External mode switch HC2",          False,  "bool"),
+    (730,   "Heating circuit pump HC2",          False,  "running"),
+    (715,   "Holiday program HC2",               False,  "bool"),
+    (718,   "Frost protection HC2",              False,  "safety"),
+    (80,    "Party mode temperature HC2",        False,  "num_temp"),
+    (83,    "Room temperature setpoint HC2",     False,  "num_temp"),
+    (86,    "Reduced temperature setpoint HC2",  False,  "num_temp"),
+    (2871,  "Heating curve slope HC2",           False,  "num"),
+    (2877,  "Heating curve level HC2",           False,  "num"),
+    (7856,  "Party mode HC2",                    False,  "switch"),
+    (7853,  "Energy saving mode HC2",            False,  "switch"),
+    (94,    "Operating mode HC2",                False,  "select"),
+    (307,   "Holiday start date HC2",            False,  "date"),
+    (310,   "Holiday end date HC2",              False,  "date"),
+
+    # ---- Heating circuit 3 (HC3) -----------------------------------------
+    (710,   "Current operating mode HC3",        False,  "enum"),
+    (78,    "Party mode status HC3",             False,  "bool"),
+    (90,    "Energy saving status HC3",          False,  "bool"),
+    (272,   "External mode switch HC3",          False,  "bool"),
+    (731,   "Heating circuit pump HC3",          False,  "running"),
+    (716,   "Holiday program HC3",               False,  "bool"),
+    (719,   "Frost protection HC3",              False,  "safety"),
+    (81,    "Party mode temperature HC3",        False,  "num_temp"),
+    (84,    "Room temperature setpoint HC3",     False,  "num_temp"),
+    (87,    "Reduced temperature setpoint HC3",  False,  "num_temp"),
+    (2873,  "Heating curve slope HC3",           False,  "num"),
+    (2879,  "Heating curve level HC3",           False,  "num"),
+    (7857,  "Party mode HC3",                    False,  "switch"),
+    (7854,  "Energy saving mode HC3",            False,  "switch"),
+    (96,    "Operating mode HC3",                False,  "select"),
+    (308,   "Holiday start date HC3",            False,  "date"),
+    (311,   "Holiday end date HC3",              False,  "date"),
 
     # ====================================================================
     # Heat pump attributes (VT 200, Vitocal, etc.)
@@ -309,6 +366,8 @@ _TABLE: list[tuple[int, str, bool, str]] = [
 _ENUM_MAPS: dict[int, dict[str, str]] = {
     # -- Enum status sensors --------------------------------------------------
     708:   {"0": "Standby", "1": "Reduced", "2": "Normal", "3": "Continuous normal"},
+    709:   {"0": "Standby", "1": "Reduced", "2": "Normal", "3": "Continuous normal"},
+    710:   {"0": "Standby", "1": "Reduced", "2": "Normal", "3": "Continuous normal"},
     7987:  {"0": "Not present", "1": "Direct circuit", "2": "Mixer circuit"},
     10761: {
         "0": "OK", "1": "Short circuit", "2": "Open circuit",
@@ -320,6 +379,14 @@ _ENUM_MAPS: dict[int, dict[str, str]] = {
     },
     # -- Select entities ------------------------------------------------------
     92: {
+        "0": "Off", "1": "DHW only", "2": "Heating + DHW",
+        "3": "Continuous reduced", "4": "Continuous normal",
+    },
+    94: {
+        "0": "Off", "1": "DHW only", "2": "Heating + DHW",
+        "3": "Continuous reduced", "4": "Continuous normal",
+    },
+    96: {
         "0": "Off", "1": "DHW only", "2": "Heating + DHW",
         "3": "Continuous reduced", "4": "Continuous normal",
     },

@@ -117,7 +117,7 @@ Most installations have one location with one device. Device-scoped operations (
 
 ## Known Attributes
 
-These are the well-known attribute IDs used by the integration's hardcoded entity definitions. Devices may support many more — discovered via `GetTypeInfo`.
+The full registry is in `attributes.py`. Below are the most common IDs for reference. Devices may support many more — discovered via `GetTypeInfo`.
 
 ### Temperatures (read-only)
 
@@ -181,6 +181,34 @@ These are the well-known attribute IDs used by the integration's hardcoded entit
 | 306 | Holidays start date | RW |
 | 309 | Holidays end date | RW |
 | 714 | Holiday program active | RO |
+
+### Solar System
+
+| ID | Name | Unit |
+|---|---|---|
+| 5272 | Solar collector temperature | °C |
+| 5276 | Solar storage temperature | °C |
+| 5277 | Solar operating hours | h |
+| 5279 | Solar energy total | kWh |
+| 7895 | Solar yield current year | kWh |
+| 5273 | Solar recharge suppression | — |
+| 5274 | Solar pump | — |
+
+### Heating Circuit 2 / 3
+
+Multi-circuit devices use offset attribute IDs. HC2 IDs are verified; HC3 follows the same offset pattern.
+
+| HC1 ID | HC2 ID | HC3 ID | Name pattern |
+|---|---|---|---|
+| 708 | 709 | 710 | Current operating mode |
+| 92 | 94 | 96 | Operating mode (RW) |
+| 7855 | 7856 | 7857 | Party mode (RW) |
+| 82 | 83 | 84 | Room temperature setpoint |
+| 729 | 730 | 731 | Heating circuit pump |
+
+### Heat Pump
+
+Heat pump devices (VT 200, Vitocal) use a separate set of attribute IDs (mostly in the 6xxx–8xxx range). See `attributes.py` for the full list.
 
 ## Important Constraints
 

@@ -12,7 +12,7 @@ from . import VitotrolConfigEntry
 from .api import AttributeTypeInfo, VitotrolDevice
 from .attributes import ATTRIBUTE_REGISTRY, AttrMeta
 from .coordinator import VitotrolCoordinator
-from .entity import VitotrolEntity, entity_key_for_attr
+from .entity import VitotrolEntity, entity_key_for_attr, infer_unknown_metadata
 
 
 async def async_setup_entry(
@@ -30,9 +30,16 @@ async def async_setup_entry(
 
         for attr_id, info in catalog.items():
             meta = ATTRIBUTE_REGISTRY.get(attr_id)
-            if meta is None or meta.platform != "switch":
-                continue
-            entities.append(VitotrolSwitch(coordinator, device, info, meta))
+
+            if meta is not None:
+                if meta.platform != "switch":
+                    continue
+                entities.append(VitotrolSwitch(coordinator, device, info, meta))
+            else:
+                inferred = infer_unknown_metadata(info)
+                if inferred.platform != "switch":
+                    continue
+                entities.append(VitotrolSwitch(coordinator, device, info, meta=None))
 
     async_add_entities(entities)
 
@@ -45,13 +52,19 @@ class VitotrolSwitch(VitotrolEntity, SwitchEntity):
         coordinator: VitotrolCoordinator,
         device: VitotrolDevice,
         info: AttributeTypeInfo,
-        meta: AttrMeta,
+        meta: AttrMeta | None,
     ) -> None:
         key = entity_key_for_attr(info.attr_id, meta)
         super().__init__(coordinator, device, key)
         self._vitotrol_attr_id = info.attr_id
-        self._attr_name = meta.name
-        self._attr_entity_registry_enabled_default = meta.enabled_by_default
+
+        if meta is not None:
+            self._attr_name = meta.name
+            self._attr_entity_registry_enabled_default = meta.enabled_by_default
+        else:
+            inferred = infer_unknown_metadata(info)
+            self._attr_name = inferred.display_name
+            self._attr_entity_registry_enabled_default = False
 
     @property
     def available(self) -> bool:

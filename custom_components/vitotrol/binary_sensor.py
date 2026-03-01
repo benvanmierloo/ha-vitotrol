@@ -69,7 +69,7 @@ class VitotrolBinarySensor(VitotrolEntity, BinarySensorEntity):
             on_keys = tuple(
                 str(k)
                 for k, v in (info.enum_values or {}).items()
-                if v.lower() == "ein"
+                if v.lower() in ("ein", "aktiv")
             )
             self._on_values = on_keys if on_keys else ("1",)
 

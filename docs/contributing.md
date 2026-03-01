@@ -83,6 +83,8 @@ Everything is driven by a single table `_TABLE` and two optional override dicts.
 | `num` | number | — | — | Other writable numeric values |
 | `switch` | switch | — | — | Writable on/off toggles |
 | `select` | select | — | — | Writable enum (needs `_ENUM_MAPS` entry) |
+| `cop` | sensor | — | — | Coefficient of performance (measurement) |
+| `date` | sensor | — | — | Date/time attributes (text representation) |
 | `none` | — | — | — | No standalone entity (used by climate or not yet supported) |
 
 ### Examples

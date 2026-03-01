@@ -42,6 +42,9 @@ Temperatures (RO): IndoorTemp=5367, OutdoorTemp=5373, BoilerTemp=5374, HotWaterT
 Setpoints (RW): HeatNormalTemp=82, HeatReducedTemp=85, PartyModeTemp=79, HotWaterSetpointTemp=51.
 Modes (RW): OperatingModeRequested=92 (0=off,1=DHW,2=heat+DHW,3=cont.reduced,4=cont.normal). Modes (RO): OperatingModeCurrent=708.
 Switches (RW): PartyMode=7855, EnergySavingMode=7852. Status (RO): BurnerState=600, HeatingPumpStatus=729.
+HC2 equivalents: OpMode=94, CurMode=709, PartyMode=7856, EcoMode=7853, Pump=730, NormalTemp=83, ReducedTemp=86.
+HC3 equivalents: OpMode=96, CurMode=710, PartyMode=7857, EcoMode=7854, Pump=731, NormalTemp=84, ReducedTemp=87.
+Solar: CollectorTemp=5272, StorageTemp=5276, Hours=5277, EnergyTotal=5279, YieldThisYear=7895, Pump=5274.
 
 All device attributes are discovered via GetTypeInfo and created as entities. Known attributes are enabled by default; all others are disabled by default and can be enabled via standard HA UI.
 

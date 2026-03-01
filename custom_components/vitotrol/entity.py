@@ -49,12 +49,15 @@ class InferredMeta:
     suggested_precision: int | None = None
 
 
+_BINARY_LABEL_PAIRS = (frozenset({"aus", "ein"}), frozenset({"aktiv", "inaktiv"}))
+
+
 def _is_binary_enum(info: AttributeTypeInfo) -> bool:
     """Return True if enum values look like a simple on/off pair."""
     if info.enum_values is None:
         return False
     labels = {str(v).lower() for v in info.enum_values.values()}
-    return bool(labels) and labels <= {"aus", "ein"}
+    return bool(labels) and any(labels <= pair for pair in _BINARY_LABEL_PAIRS)
 
 
 def _group_prefix(group: str | None) -> str:
@@ -91,6 +94,12 @@ def _infer_numeric_meta(name: str) -> tuple[str | None, str | None, str | None, 
         return SensorDeviceClass.ENERGY, UnitOfEnergy.KILO_WATT_HOUR, SensorStateClass.TOTAL_INCREASING, None
     if n.startswith("info_verhaeltnis_"):
         return None, PERCENTAGE, SensorStateClass.MEASUREMENT, None
+    if "solarstunden" in n:
+        return SensorDeviceClass.DURATION, UnitOfTime.HOURS, SensorStateClass.TOTAL_INCREASING, None
+    if "solarenergie" in n:
+        return SensorDeviceClass.ENERGY, UnitOfEnergy.KILO_WATT_HOUR, SensorStateClass.TOTAL_INCREASING, None
+    if "solarertrag" in n:
+        return SensorDeviceClass.ENERGY, UnitOfEnergy.KILO_WATT_HOUR, SensorStateClass.MEASUREMENT, None
     return None, None, SensorStateClass.MEASUREMENT, None
 
 
@@ -108,7 +117,9 @@ def infer_unknown_metadata(info: AttributeTypeInfo) -> InferredMeta:
         return InferredMeta(platform=None, display_name=display_name)
 
     if t == "ENUM":
-        if _is_binary_enum(info) and not info.writable:
+        if _is_binary_enum(info):
+            if info.writable:
+                return InferredMeta(platform="switch", display_name=display_name)
             return InferredMeta(platform="binary_sensor", display_name=display_name)
         if info.writable:
             return InferredMeta(platform="select", display_name=display_name)

@@ -10,16 +10,18 @@ A Home Assistant custom integration for **Viessmann heating systems** that use t
 
 ## What you get
 
-| Platform | Entities | Description |
+| Platform | Examples | Description |
 |---|---|---|
 | **Climate** | Heating | HVAC modes (Off / Dry / Auto), ECO and Boost presets, target temperature control |
-| **Sensor** | 12+ sensors | Indoor, outdoor, boiler, hot water, smoke, and heating water temperatures. Burner hours, burner starts, operating mode, 3-way valve status, current error |
-| **Binary sensor** | 6 sensors | Burner, internal pump, heating pump, circulation pump, frost protection, holiday mode |
-| **Switch** | 2 switches | Party mode, energy saving mode |
-| **Number** | 3+ controls | Hot water setpoint, reduced temperature setpoint, party mode temperature |
-| **Select** | Dynamic | Writable enum attributes discovered on your device |
+| **Sensor** | 75+ sensors | Temperatures, burner hours/starts, operating modes, solar yield, energy counters, and more |
+| **Binary sensor** | 30 sensors | Burner, pumps, frost protection, holiday mode, solar pump, and more |
+| **Switch** | 10 switches | Party mode, energy saving — per heating circuit |
+| **Number** | 30+ controls | Temperature setpoints, heating curve slope/level — per heating circuit |
+| **Select** | 10+ selectors | Operating mode, heating schema, maintenance mode — plus any discovered writable enums |
 
-The integration queries your device for its full attribute catalog (`GetTypeInfo`) on first setup. Well-known attributes (listed above) are enabled by default. All other discovered attributes are created as disabled entities — enable them in the HA entity settings if you need them.
+Supports boilers (Vitodens, Vitovalor), heat pumps (VT 200, Vitocal), and solar-equipped systems. Multi-heating-circuit devices (HC1/HC2/HC3) get per-circuit entities automatically.
+
+The integration queries your device for its full attribute catalog (`GetTypeInfo`) on first setup. Well-known attributes are enabled by default. All other discovered attributes are created as disabled entities — enable them in the HA entity settings if you need them.
 
 ## Requirements
 
