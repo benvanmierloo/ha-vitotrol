@@ -99,7 +99,7 @@ def _infer_numeric_meta(name: str) -> tuple[str | None, str | None, str | None, 
     if "solarenergie" in n:
         return SensorDeviceClass.ENERGY, UnitOfEnergy.KILO_WATT_HOUR, SensorStateClass.TOTAL_INCREASING, None
     if "solarertrag" in n:
-        return SensorDeviceClass.ENERGY, UnitOfEnergy.KILO_WATT_HOUR, SensorStateClass.MEASUREMENT, None
+        return SensorDeviceClass.ENERGY, UnitOfEnergy.WATT_HOUR, SensorStateClass.MEASUREMENT, None
     return None, None, SensorStateClass.MEASUREMENT, None
 
 
