@@ -119,20 +119,79 @@ This is inherent to the API design. The default 300-second scan interval balance
 - **Single session**: The integration uses one session per account. Running the Vitotrol mobile app simultaneously may cause session conflicts.
 - **Cloud dependency**: All communication goes through Viessmann's cloud servers. If their service is down, the integration won't work.
 
-## Discovery Script
+## Sharing your device attributes
 
-A standalone script is included to explore what your device supports, without needing Home Assistant:
+When reporting issues or requesting support for new attributes, enable debug logging to capture your device's full attribute catalog. Add this to your `configuration.yaml`:
+
+```yaml
+logger:
+  logs:
+    custom_components.vitotrol: debug
+```
+
+Restart Home Assistant, then go to **Settings** > **System** > **Logs** and search for `Attribute catalog`. The log entry contains a JSON block with every attribute your device supports — IDs, names, types, units, min/max, read/write flags, and enum values.
+
+Copy the JSON block and paste it into your [GitHub issue](https://github.com/benvanmierloo/ha-vitotrol/issues). This is all we need to add support for new attributes.
+
+<details>
+<summary>Example JSON output</summary>
+
+```json
+{
+  "device_name": "MyBoiler",
+  "device_id": 12345,
+  "attributes": {
+    "51": {
+      "name": "HotWaterSetpointTemp",
+      "type": "Double",
+      "type_value": "1",
+      "min": "10",
+      "max": "60",
+      "unit": "°C",
+      "group": "Hot Water",
+      "heating_circuit_id": "",
+      "factory_default": "",
+      "readable": true,
+      "writable": true
+    },
+    "92": {
+      "name": "OperatingModeRequested",
+      "type": "Enum",
+      "type_value": "2",
+      "min": "0",
+      "max": "4",
+      "unit": "",
+      "group": "Operating Modes",
+      "heating_circuit_id": "0",
+      "factory_default": "",
+      "readable": true,
+      "writable": true,
+      "enum_values": {
+        "0": "Off",
+        "1": "DHW only",
+        "2": "Heating + DHW",
+        "3": "Cont. reduced",
+        "4": "Cont. normal"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+### Discovery script (advanced)
+
+A standalone script is also available for exploring your device without Home Assistant:
 
 ```
 pip install -r scripts/requirements.txt
 python scripts/discover.py --user YOUR_EMAIL --password YOUR_PASSWORD --values
 ```
 
-This dumps every attribute your device exposes (IDs, names, types, units, min/max, read/write flags) and optionally their current values. Useful for identifying attributes to add to the integration.
-
 ## Contributing
 
-The easiest way to contribute is adding attributes for your device. The [contributor guide](docs/contributing.md) walks through the process — it's a one-line table addition per attribute.
+The easiest way to contribute is sharing your device's attribute catalog (see above). The [contributor guide](docs/contributing.md) walks through adding attributes — it's a one-line table addition per attribute.
 
 For deeper changes, see the [architecture overview](docs/architecture.md) and [API reference](docs/api-reference.md).
 

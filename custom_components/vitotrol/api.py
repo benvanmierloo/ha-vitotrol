@@ -74,6 +74,7 @@ class AttributeTypeInfo:
     attr_id: int
     name: str
     type: str
+    type_value: str
     min_value: str
     max_value: str
     unit: str
@@ -184,6 +185,7 @@ class VitotrolAPI:
                 attr_id=attr_id,
                 name=_find_text_opt(dp, "DatenpunktName") or "",
                 type=_find_text_opt(dp, "DatenpunktTyp") or "",
+                type_value=_find_text_opt(dp, "DatenpunktTypWert") or "",
                 min_value=_find_text_opt(dp, "MinimalWert") or "",
                 max_value=_find_text_opt(dp, "MaximalWert") or "",
                 unit=_find_text_opt(dp, "EinheitBezeichnung") or "",

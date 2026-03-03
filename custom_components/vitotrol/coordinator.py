@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import timedelta
 
@@ -15,6 +16,48 @@ from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 type VitotrolData = dict[int, dict[int, str]]
+
+
+def _log_attribute_catalog(
+    device: VitotrolDevice, catalog: dict[int, AttributeTypeInfo]
+) -> None:
+    """Log the full attribute catalog as JSON at DEBUG level.
+
+    Outputs a single JSON object that users can copy-paste into a GitHub
+    issue to share their device's supported attributes.
+    """
+    attrs: dict[str, dict] = {}
+    for attr_id in sorted(catalog):
+        info = catalog[attr_id]
+        entry: dict = {
+            "name": info.name,
+            "type": info.type,
+            "type_value": info.type_value,
+            "min": info.min_value,
+            "max": info.max_value,
+            "unit": info.unit,
+            "group": info.group,
+            "heating_circuit_id": info.heating_circuit_id,
+            "factory_default": info.factory_default,
+            "readable": info.readable,
+            "writable": info.writable,
+        }
+        if info.enum_values:
+            entry["enum_values"] = {
+                str(k): v for k, v in sorted(info.enum_values.items())
+            }
+        attrs[str(attr_id)] = entry
+
+    blob = json.dumps(
+        {
+            "device_name": device.device_name,
+            "device_id": device.device_id,
+            "attributes": attrs,
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
+    _LOGGER.debug("Attribute catalog for %s:\n%s", device.device_name, blob)
 
 
 class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
@@ -59,6 +102,8 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
                 len(catalog),
                 device.device_name,
             )
+            if _LOGGER.isEnabledFor(logging.DEBUG):
+                _log_attribute_catalog(device, catalog)
 
     # ------------------------------------------------------------------
     # Pre-seed from entity registry (before first refresh)
