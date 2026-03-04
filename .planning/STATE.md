@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 1 context gathered
-last_updated: "2026-03-04T18:40:12.934Z"
+stopped_at: Completed 01-code-quality-01-PLAN.md
+last_updated: "2026-03-04T18:59:45.259Z"
 last_activity: 2026-03-04 — Roadmap revised (Phase 3 folded into Phase 2; 3 requirements removed as already done/not needed)
 progress:
   total_phases: 2
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 4
+  completed_plans: 1
   percent: 0
 ---
 
@@ -50,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01-code-quality P01 | 2 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -61,6 +62,8 @@ Recent decisions affecting current work:
 - [Roadmap]: Two-phase coarse delivery — fix bugs first, then CI/release/publish. Rationale: shipping broken write behavior would generate immediate user complaints.
 - [Roadmap]: All test requirements for bug fix coverage (TEST-02..05) grouped with Phase 1, not Phase 2 (CI). Tests validate the fixes, so they belong with the fixes.
 - [Roadmap revision]: Collapsed Phase 3 (HACS Submission) into Phase 2. HACS-02 (repo topics) already done, HACS-04 (hacs/default PR) already submitted, HACS-05 (brands PR) not needed (HA 2026.3 serves from repo). Only HACS-01 (logo) and HACS-03 (README check) remain as light polish in Phase 2.
+- [Phase 01-code-quality]: Split inner except in auth retry: persistent VitotrolAuthError raises ConfigEntryAuthFailed (not UpdateFailed) so HA triggers reauth flow
+- [Phase 01-code-quality]: ConfigEntryNotReady from async_setup_type_info propagates through __init__.py VitotrolError guard naturally (not a subclass)
 
 ### Pending Todos
 
@@ -73,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T18:40:12.931Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-code-quality/01-CONTEXT.md
+Last session: 2026-03-04T18:59:45.257Z
+Stopped at: Completed 01-code-quality-01-PLAN.md
+Resume file: None

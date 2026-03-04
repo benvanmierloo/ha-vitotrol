@@ -14,12 +14,12 @@ Requirements for the v1.0.0 HACS release. Each maps to roadmap phases.
 - [ ] **BUGS-03**: Number entity step size derived from GetTypeInfo metadata instead of hardcoded `1.0`
 - [ ] **BUGS-04**: Climate preset writes check `writable` flag before attempting write to eco_mode/party_mode attributes; read-only attributes skipped with warning log
 - [ ] **BUGS-05**: All entity write operations (climate, switch, number, select) raise `HomeAssistantError` or `ServiceValidationError` on failure, producing user-visible HA error toasts
-- [ ] **BUGS-06**: Authentication failures in coordinator polling raise `ConfigEntryAuthFailed`, triggering HA's built-in reauth flow
-- [ ] **BUGS-07**: Empty GetTypeInfo catalog (zero attributes returned) logs a warning and raises `ConfigEntryNotReady` rather than silently creating zero entities
+- [x] **BUGS-06**: Authentication failures in coordinator polling raise `ConfigEntryAuthFailed`, triggering HA's built-in reauth flow
+- [x] **BUGS-07**: Empty GetTypeInfo catalog (zero attributes returned) logs a warning and raises `ConfigEntryNotReady` rather than silently creating zero entities
 
 ### HA Patterns
 
-- [ ] **HAPAT-01**: `VitotrolCoordinator` receives `config_entry` as constructor parameter and passes it to `DataUpdateCoordinator.__init__`
+- [x] **HAPAT-01**: `VitotrolCoordinator` receives `config_entry` as constructor parameter and passes it to `DataUpdateCoordinator.__init__`
 - [ ] **HAPAT-02**: Config flow surfaces distinct error messages for auth failure, network error, and no-devices-found cases
 
 ### Test Coverage
@@ -79,9 +79,9 @@ Scoped for a point release after v1.0.0 has been stable for 2-4 weeks.
 | BUGS-03 | Phase 1 | Pending |
 | BUGS-04 | Phase 1 | Pending |
 | BUGS-05 | Phase 1 | Pending |
-| BUGS-06 | Phase 1 | Pending |
-| BUGS-07 | Phase 1 | Pending |
-| HAPAT-01 | Phase 1 | Pending |
+| BUGS-06 | Phase 1 | Complete |
+| BUGS-07 | Phase 1 | Complete |
+| HAPAT-01 | Phase 1 | Complete |
 | HAPAT-02 | Phase 1 | Pending |
 | TEST-01 | Phase 2 | Pending |
 | TEST-02 | Phase 1 | Pending |
