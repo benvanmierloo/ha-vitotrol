@@ -4,7 +4,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 
 import pytest
-from homeassistant.config_entries import SOURCE_USER
+from homeassistant.config_entries import SOURCE_REAUTH, SOURCE_USER
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
@@ -100,6 +100,72 @@ async def test_user_flow_no_devices(hass: HomeAssistant, mock_api) -> None:
 
     assert result["type"] == FlowResultType.FORM
     assert result["errors"] == {"base": "no_devices"}
+
+
+async def test_reauth_flow_success(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """Successful reauth updates the stored password."""
+    mock_config_entry.add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={
+            "source": SOURCE_REAUTH,
+            "entry_id": mock_config_entry.entry_id,
+        },
+        data=mock_config_entry.data,
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "reauth_confirm"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_PASSWORD: "new_secret"}
+    )
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert mock_config_entry.data[CONF_PASSWORD] == "new_secret"
+
+
+async def test_reauth_flow_invalid_auth(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """Wrong password during reauth shows invalid_auth error."""
+    mock_config_entry.add_to_hass(hass)
+    mock_api.return_value.login = AsyncMock(side_effect=VitotrolAuthError("bad"))
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
+        data=mock_config_entry.data,
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_PASSWORD: "wrong"}
+    )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_auth"}
+
+
+async def test_reauth_flow_cannot_connect(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """Network failure during reauth shows cannot_connect error."""
+    mock_config_entry.add_to_hass(hass)
+    mock_api.return_value.login = AsyncMock(side_effect=VitotrolError("timeout"))
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_REAUTH, "entry_id": mock_config_entry.entry_id},
+        data=mock_config_entry.data,
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_PASSWORD: "secret"}
+    )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"] == {"base": "cannot_connect"}
 
 
 async def test_options_flow_sets_scan_interval(
