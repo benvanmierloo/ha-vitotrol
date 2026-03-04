@@ -14,6 +14,8 @@ from .attributes import ATTRIBUTE_REGISTRY, AttrMeta
 from .coordinator import VitotrolCoordinator
 from .entity import VitotrolEntity, entity_key_for_attr, infer_unknown_metadata
 
+PARALLEL_UPDATES = 0
+
 _LOGGER = logging.getLogger(__name__)
 
 

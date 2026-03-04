@@ -21,6 +21,8 @@ from .attributes import CLIMATE_CONFIGS, ClimateMeta
 from .coordinator import VitotrolCoordinator
 from .entity import VitotrolEntity
 
+PARALLEL_UPDATES = 0
+
 _LOGGER = logging.getLogger(__name__)
 
 PRESET_NONE = "none"
