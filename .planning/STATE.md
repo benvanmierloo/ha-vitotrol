@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-code-quality-01-PLAN.md
-last_updated: "2026-03-04T18:59:45.259Z"
-last_activity: 2026-03-04 — Roadmap revised (Phase 3 folded into Phase 2; 3 requirements removed as already done/not needed)
+stopped_at: Completed 01-code-quality-02-PLAN.md
+last_updated: "2026-03-04T19:01:25Z"
+last_activity: 2026-03-04 — Fixed WriteData value truncation bug (BUGS-02)
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 1 of 2 (Code Quality)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-03-04 — Roadmap revised (Phase 3 folded into Phase 2; 3 requirements removed as already done/not needed)
+Plan: 2 of 4 total plans complete
+Status: In progress
+Last activity: 2026-03-04 — Fixed WriteData value truncation bug (BUGS-02)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 01-code-quality P01 | 2 | 3 tasks | 2 files |
+| Phase 01-code-quality P02 | 4 | 1 task (TDD: 2 commits) | 2 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,7 @@ Recent decisions affecting current work:
 - [Roadmap revision]: Collapsed Phase 3 (HACS Submission) into Phase 2. HACS-02 (repo topics) already done, HACS-04 (hacs/default PR) already submitted, HACS-05 (brands PR) not needed (HA 2026.3 serves from repo). Only HACS-01 (logo) and HACS-03 (README check) remain as light polish in Phase 2.
 - [Phase 01-code-quality]: Split inner except in auth retry: persistent VitotrolAuthError raises ConfigEntryAuthFailed (not UpdateFailed) so HA triggers reauth flow
 - [Phase 01-code-quality]: ConfigEntryNotReady from async_setup_type_info propagates through __init__.py VitotrolError guard naturally (not a subclass)
+- [Phase 01-code-quality P02]: _format_wire_value returns original string for non-whole-number floats to avoid float-to-string precision artifacts
 
 ### Pending Todos
 
@@ -76,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T18:59:45.257Z
-Stopped at: Completed 01-code-quality-01-PLAN.md
+Last session: 2026-03-04T19:01:25Z
+Stopped at: Completed 01-code-quality-02-PLAN.md
 Resume file: None
