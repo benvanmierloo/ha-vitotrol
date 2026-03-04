@@ -6,6 +6,7 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import VitotrolConfigEntry
@@ -83,16 +84,34 @@ class VitotrolSwitch(VitotrolEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the switch."""
-        await self.coordinator.async_write(
-            self._device, self._vitotrol_attr_id, "1"
-        )
+        old_value = self._get_attr_value(self._vitotrol_attr_id)
+        try:
+            await self.coordinator.async_write(
+                self._device, self._vitotrol_attr_id, "1"
+            )
+        except Exception as err:
+            if old_value is not None:
+                self._update_coordinator_data(self._vitotrol_attr_id, old_value)
+            self.async_write_ha_state()
+            raise HomeAssistantError(
+                f"Failed to turn on {self._attr_name} (attr {self._vitotrol_attr_id}): {err}"
+            ) from err
         self._update_coordinator_data(self._vitotrol_attr_id, "1")
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the switch."""
-        await self.coordinator.async_write(
-            self._device, self._vitotrol_attr_id, "0"
-        )
+        old_value = self._get_attr_value(self._vitotrol_attr_id)
+        try:
+            await self.coordinator.async_write(
+                self._device, self._vitotrol_attr_id, "0"
+            )
+        except Exception as err:
+            if old_value is not None:
+                self._update_coordinator_data(self._vitotrol_attr_id, old_value)
+            self.async_write_ha_state()
+            raise HomeAssistantError(
+                f"Failed to turn off {self._attr_name} (attr {self._vitotrol_attr_id}): {err}"
+            ) from err
         self._update_coordinator_data(self._vitotrol_attr_id, "0")
         self.async_write_ha_state()
