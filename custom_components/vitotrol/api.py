@@ -283,8 +283,7 @@ class VitotrolAPI:
         self, device: VitotrolDevice, attr_id: int, value: str
     ) -> str:
         """Write a value to the device. Returns a refresh ID."""
-        # The API only accepts whole numbers — strip any decimal part.
-        wire_value = str(int(float(value))) if "." in value else value
+        wire_value = _format_wire_value(value)
         body = (
             "<WriteData>"
             f"<AnlageId>{device.location_id}</AnlageId>"
@@ -485,3 +484,24 @@ def _find_text_opt(element: ElementTree.Element, tag: str) -> str | None:
     if child is None:
         return None
     return child.text
+
+
+def _format_wire_value(value: str) -> str:
+    """Format a value string for SOAP WriteData.
+
+    The Vitotrol API server uses int.Parse() for Integer-type attributes
+    and parses period-separated decimals for Double-type attributes.
+
+    Rules:
+      - "20.0"  -> "20"   (whole number: strip trailing .0)
+      - "20.5"  -> "20.5" (meaningful decimal: preserve)
+      - "20"    -> "20"   (no decimal: passthrough)
+    """
+    if "." in value:
+        try:
+            f = float(value)
+            if f == int(f):
+                return str(int(f))
+        except (ValueError, OverflowError):
+            pass
+    return value
