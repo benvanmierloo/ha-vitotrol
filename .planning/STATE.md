@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Completed 01-code-quality-03-PLAN.md
-last_updated: "2026-03-04T19:40:00Z"
+status: executing
+stopped_at: Completed 01-code-quality-04-PLAN.md
+last_updated: "2026-03-04T19:15:33.806Z"
 last_activity: 2026-03-04 — Applied optimistic-rollback + HomeAssistantError to all write platforms (BUGS-01, BUGS-03, BUGS-04, BUGS-05)
 progress:
   total_phases: 2
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
   percent: 75
 ---
 
@@ -52,6 +52,7 @@ Progress: [███████░░░] 75%
 *Updated after each plan completion*
 | Phase 01-code-quality P01 | 2 | 3 tasks | 2 files |
 | Phase 01-code-quality P02 | 4 | 1 task (TDD: 2 commits) | 2 files |
+| Phase 01-code-quality P04 | 15 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,7 @@ Recent decisions affecting current work:
 - [Phase 01-code-quality P03]: Rollback via _update_coordinator_data(old_value) + async_write_ha_state() restores entity state immediately without waiting for next poll cycle
 - [Phase 01-code-quality P03]: Number.native_value returns float for Double, int for Integer; write passes str(float) for Double, str(int) for Integer; api.py strips .0 for wire
 - [Phase 01-code-quality P03]: Climate preset guard silently skips read-only eco/party attrs with warning log — partial presets are valid UX for devices that report attrs as RO
+- [Phase 01-code-quality]: Malformed enum sub-IDs (e.g. '92-abc') are skipped with a warning log rather than crashing — partial enum maps are valid
 
 ### Pending Todos
 
@@ -81,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T19:40:00Z
-Stopped at: Completed 01-code-quality-03-PLAN.md
+Last session: 2026-03-04T19:15:33.804Z
+Stopped at: Completed 01-code-quality-04-PLAN.md
 Resume file: None

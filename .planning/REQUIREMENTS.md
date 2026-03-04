@@ -20,15 +20,15 @@ Requirements for the v1.0.0 HACS release. Each maps to roadmap phases.
 ### HA Patterns
 
 - [x] **HAPAT-01**: `VitotrolCoordinator` receives `config_entry` as constructor parameter and passes it to `DataUpdateCoordinator.__init__`
-- [ ] **HAPAT-02**: Config flow surfaces distinct error messages for auth failure, network error, and no-devices-found cases
+- [x] **HAPAT-02**: Config flow surfaces distinct error messages for auth failure, network error, and no-devices-found cases
 
 ### Test Coverage
 
 - [ ] **TEST-01**: Pytest GitHub Actions workflow runs on push, pull_request, and weekly schedule; badge shown in README
-- [ ] **TEST-02**: Test covers optimistic state rollback when WriteData raises exception
-- [ ] **TEST-03**: Test covers GetTypeInfo response with malformed/empty enum values
-- [ ] **TEST-04**: Test covers config flow behavior when GetDevices returns empty device list
-- [ ] **TEST-05**: Test covers concurrent write operations completing independently
+- [x] **TEST-02**: Test covers optimistic state rollback when WriteData raises exception
+- [x] **TEST-03**: Test covers GetTypeInfo response with malformed/empty enum values
+- [x] **TEST-04**: Test covers config flow behavior when GetDevices returns empty device list
+- [x] **TEST-05**: Test covers concurrent write operations completing independently
 
 ### Release Pipeline
 
@@ -82,12 +82,12 @@ Scoped for a point release after v1.0.0 has been stable for 2-4 weeks.
 | BUGS-06 | Phase 1 | Complete |
 | BUGS-07 | Phase 1 | Complete |
 | HAPAT-01 | Phase 1 | Complete |
-| HAPAT-02 | Phase 1 | Pending |
+| HAPAT-02 | Phase 1 | Complete |
 | TEST-01 | Phase 2 | Pending |
-| TEST-02 | Phase 1 | Pending |
-| TEST-03 | Phase 1 | Pending |
-| TEST-04 | Phase 1 | Pending |
-| TEST-05 | Phase 1 | Pending |
+| TEST-02 | Phase 1 | Complete |
+| TEST-03 | Phase 1 | Complete |
+| TEST-04 | Phase 1 | Complete |
+| TEST-05 | Phase 1 | Complete |
 | REL-01 | Phase 2 | Pending |
 | REL-02 | Phase 2 | Pending |
 | REL-03 | Phase 2 | Pending |
