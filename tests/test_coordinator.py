@@ -1,10 +1,12 @@
 """Tests for VitotrolCoordinator."""
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from homeassistant.config_entries import ConfigEntryAuthFailed
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.vitotrol.api import VitotrolAuthError, VitotrolError
@@ -146,6 +148,94 @@ def test_pre_seed_skips_disabled_registry_entries(hass: HomeAssistant) -> None:
 
     coord.pre_seed_from_registry([_DisabledEntry()])
     assert not coord._entity_attr_ids.get(FAKE_DEVICE.device_id)
+
+
+# ---------------------------------------------------------------------------
+# Task 1: config_entry param and ConfigEntryAuthFailed
+# ---------------------------------------------------------------------------
+
+
+def test_coordinator_accepts_config_entry_kwarg(hass: HomeAssistant) -> None:
+    """VitotrolCoordinator constructor accepts config_entry kwarg."""
+    api = AsyncMock()
+    fake_entry = MagicMock()
+    coord = VitotrolCoordinator(
+        hass, api, [FAKE_DEVICE], scan_interval=300, config_entry=fake_entry
+    )
+    # The coordinator should hold a reference to the config_entry via the parent
+    assert coord.config_entry is fake_entry
+
+
+async def test_persistent_auth_error_raises_config_entry_auth_failed(
+    hass: HomeAssistant,
+) -> None:
+    """When retry also raises VitotrolAuthError, ConfigEntryAuthFailed is raised."""
+    api = AsyncMock()
+    api.login = AsyncMock()
+    api.refresh_data_wait = AsyncMock(return_value=None)
+    api.get_data = AsyncMock(
+        side_effect=[VitotrolAuthError("expired"), VitotrolAuthError("still invalid")]
+    )
+
+    coord = VitotrolCoordinator(hass, api, [FAKE_DEVICE], scan_interval=300)
+    coord._attribute_catalog[FAKE_DEVICE.device_id] = {5373: FAKE_ATTR_INFO}
+    coord._entity_attr_ids[FAKE_DEVICE.device_id] = {"uid_5373": {5373}}
+
+    with pytest.raises(ConfigEntryAuthFailed):
+        await coord._async_update_data()
+
+    assert api.login.call_count == 1
+
+
+async def test_persistent_non_auth_error_raises_update_failed(
+    hass: HomeAssistant,
+) -> None:
+    """When retry raises generic VitotrolError (not auth), UpdateFailed is still raised."""
+    api = AsyncMock()
+    api.login = AsyncMock()
+    api.refresh_data_wait = AsyncMock(return_value=None)
+    api.get_data = AsyncMock(
+        side_effect=[VitotrolAuthError("expired"), VitotrolError("network timeout")]
+    )
+
+    coord = VitotrolCoordinator(hass, api, [FAKE_DEVICE], scan_interval=300)
+    coord._attribute_catalog[FAKE_DEVICE.device_id] = {5373: FAKE_ATTR_INFO}
+    coord._entity_attr_ids[FAKE_DEVICE.device_id] = {"uid_5373": {5373}}
+
+    with pytest.raises(UpdateFailed):
+        await coord._async_update_data()
+
+    assert api.login.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Task 2: Empty catalog guard
+# ---------------------------------------------------------------------------
+
+
+async def test_empty_catalog_raises_config_entry_not_ready(
+    hass: HomeAssistant,
+) -> None:
+    """When get_type_info returns empty dict, async_setup_type_info raises ConfigEntryNotReady."""
+    api = AsyncMock()
+    api.get_type_info = AsyncMock(return_value={})
+
+    coord = VitotrolCoordinator(hass, api, [FAKE_DEVICE], scan_interval=300)
+
+    with pytest.raises(ConfigEntryNotReady):
+        await coord.async_setup_type_info()
+
+
+async def test_non_empty_catalog_completes_normally(hass: HomeAssistant) -> None:
+    """When get_type_info returns non-empty dict, async_setup_type_info completes normally."""
+    api = AsyncMock()
+    api.get_type_info = AsyncMock(return_value={5373: FAKE_ATTR_INFO})
+
+    coord = VitotrolCoordinator(hass, api, [FAKE_DEVICE], scan_interval=300)
+    await coord.async_setup_type_info()
+
+    assert FAKE_DEVICE.device_id in coord._attribute_catalog
+    assert coord._attribute_catalog[FAKE_DEVICE.device_id] == {5373: FAKE_ATTR_INFO}
 
 
 async def test_debug_catalog_logged(hass: HomeAssistant, caplog) -> None:
