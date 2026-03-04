@@ -6,6 +6,7 @@ import logging
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import VitotrolConfigEntry
@@ -52,7 +53,6 @@ class VitotrolNumber(VitotrolEntity, NumberEntity):
     """Number entity for a writable Vitotrol attribute."""
 
     _attr_mode = NumberMode.BOX
-    _attr_suggested_display_precision = 0
 
     def __init__(
         self,
@@ -86,8 +86,16 @@ class VitotrolNumber(VitotrolEntity, NumberEntity):
         except (ValueError, TypeError):
             pass
 
-        # The API only accepts whole numbers for writable attributes.
-        self._attr_native_step = 1.0
+        # Store type for use in native_value and async_set_native_value
+        self._info_type = info.type
+
+        # Step size and display precision from attribute type
+        if info.type == "Double":
+            self._attr_native_step = 0.5
+            self._attr_suggested_display_precision = 1
+        else:
+            self._attr_native_step = 1.0
+            self._attr_suggested_display_precision = 0
 
     @property
     def available(self) -> bool:
@@ -95,13 +103,14 @@ class VitotrolNumber(VitotrolEntity, NumberEntity):
         return super().available and self._vitotrol_attr_id in self._device_data
 
     @property
-    def native_value(self) -> int | None:
+    def native_value(self) -> float | int | None:
         """Return the current value."""
         raw = self._get_attr_value(self._vitotrol_attr_id)
         if raw is None:
             return None
         try:
-            return int(float(raw))
+            v = float(raw)
+            return v if self._info_type == "Double" else int(v)
         except (ValueError, OverflowError):
             _LOGGER.debug(
                 "Number %s (attr %d): cannot parse %r as number",
@@ -113,9 +122,19 @@ class VitotrolNumber(VitotrolEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set a new value."""
-        str_value = str(int(value))
-        await self.coordinator.async_write(
-            self._device, self._vitotrol_attr_id, str_value
-        )
+        # Format: Double attrs can have meaningful decimals; Integer attrs must be whole
+        str_value = str(value) if self._info_type == "Double" else str(int(value))
+        old_value = self._get_attr_value(self._vitotrol_attr_id)
+        try:
+            await self.coordinator.async_write(
+                self._device, self._vitotrol_attr_id, str_value
+            )
+        except Exception as err:
+            if old_value is not None:
+                self._update_coordinator_data(self._vitotrol_attr_id, old_value)
+            self.async_write_ha_state()
+            raise HomeAssistantError(
+                f"Failed to write {self._attr_name} (attr {self._vitotrol_attr_id}): {err}"
+            ) from err
         self._update_coordinator_data(self._vitotrol_attr_id, str_value)
         self.async_write_ha_state()

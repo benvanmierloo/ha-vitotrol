@@ -40,7 +40,7 @@ async def _load(hass: HomeAssistant, entry: MockConfigEntry) -> None:
 async def test_hot_water_setpoint_value(
     hass: HomeAssistant, mock_api, mock_config_entry
 ) -> None:
-    """Number entity reports the current setpoint value."""
+    """Number entity reports the current setpoint value as float for Double type."""
     mock_api.return_value.get_type_info = AsyncMock(return_value={51: FAKE_HW_SETPOINT_INFO})
     mock_api.return_value.get_data = AsyncMock(return_value={51: "55"})
 
@@ -50,7 +50,8 @@ async def test_hot_water_setpoint_value(
     assert state is not None, (
         f"Entity not found. States: {[s.entity_id for s in hass.states.async_all()]}"
     )
-    assert state.state == "55"
+    # FAKE_HW_SETPOINT_INFO.type == "Double" → native_value returns float → state "55.0"
+    assert state.state == "55.0"
 
 
 async def test_number_unavailable_when_attr_missing(
@@ -68,10 +69,14 @@ async def test_number_unavailable_when_attr_missing(
     assert state.state == STATE_UNAVAILABLE
 
 
-async def test_set_value_writes_integer(
+async def test_set_value_writes_double(
     hass: HomeAssistant, mock_api, mock_config_entry
 ) -> None:
-    """Setting a value writes the integer string to the API."""
+    """Setting a value on a Double-type attr passes the float string to the API.
+
+    api.py's _format_wire_value strips trailing .0 before the SOAP call,
+    so number.py correctly passes "55.0" (not int-truncated "55").
+    """
     mock_api.return_value.get_type_info = AsyncMock(return_value={51: FAKE_HW_SETPOINT_INFO})
     mock_api.return_value.get_data = AsyncMock(return_value={51: "50"})
 
@@ -87,7 +92,7 @@ async def test_set_value_writes_integer(
         blocking=True,
     )
 
-    mock_api.return_value.write_data_wait.assert_called_once_with(FAKE_DEVICE, 51, "55")
+    mock_api.return_value.write_data_wait.assert_called_once_with(FAKE_DEVICE, 51, "55.0")
 
 
 async def test_unknown_number_attr_registered(
@@ -142,13 +147,14 @@ async def test_number_invalid_data_state_unknown(
 # Step size from attribute type (BUGS-03)
 # ---------------------------------------------------------------------------
 
-FAKE_INTEGER_SETPOINT_INFO = AttributeTypeInfo(
-    attr_id=82,
-    name="TempNormBetrieb",
+# Attr 85 — Reduced temperature setpoint, enabled by default, num_temp platform, Integer type
+FAKE_REDUCED_TEMP_INTEGER_INFO = AttributeTypeInfo(
+    attr_id=85,
+    name="TempAbsenkBetrieb",
     type="Integer",
     type_value="2",
-    min_value="10",
-    max_value="30",
+    min_value="3",
+    max_value="37",
     unit="°C",
     group="Heizkreis",
     heating_circuit_id=None,
@@ -177,13 +183,15 @@ async def test_integer_attr_has_step_1_0(
     hass: HomeAssistant, mock_api, mock_config_entry
 ) -> None:
     """Integer-type number entity has native_step=1.0."""
-    mock_api.return_value.get_type_info = AsyncMock(return_value={82: FAKE_INTEGER_SETPOINT_INFO})
-    mock_api.return_value.get_data = AsyncMock(return_value={82: "21"})
+    mock_api.return_value.get_type_info = AsyncMock(return_value={85: FAKE_REDUCED_TEMP_INTEGER_INFO})
+    mock_api.return_value.get_data = AsyncMock(return_value={85: "21"})
 
     await _load(hass, mock_config_entry)
 
-    state = hass.states.get("number.vitovalor_300_p_heat_normal_temperature")
-    assert state is not None
+    state = hass.states.get("number.vitovalor_300_p_reduced_temperature_setpoint")
+    assert state is not None, (
+        f"Entity not found. States: {[s.entity_id for s in hass.states.async_all()]}"
+    )
     assert float(state.attributes["step"]) == 1.0
 
 
@@ -206,12 +214,12 @@ async def test_integer_native_value_returns_int(
     hass: HomeAssistant, mock_api, mock_config_entry
 ) -> None:
     """Integer-type number entity returns int native_value (no .0 suffix)."""
-    mock_api.return_value.get_type_info = AsyncMock(return_value={82: FAKE_INTEGER_SETPOINT_INFO})
-    mock_api.return_value.get_data = AsyncMock(return_value={82: "21"})
+    mock_api.return_value.get_type_info = AsyncMock(return_value={85: FAKE_REDUCED_TEMP_INTEGER_INFO})
+    mock_api.return_value.get_data = AsyncMock(return_value={85: "21"})
 
     await _load(hass, mock_config_entry)
 
-    state = hass.states.get("number.vitovalor_300_p_heat_normal_temperature")
+    state = hass.states.get("number.vitovalor_300_p_reduced_temperature_setpoint")
     assert state is not None
     assert state.state == "21"
 
