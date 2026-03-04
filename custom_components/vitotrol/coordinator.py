@@ -100,6 +100,16 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
         """
         for device in self.devices:
             catalog = await self.api.get_type_info(device)
+            if not catalog:
+                _LOGGER.warning(
+                    "GetTypeInfo returned no attributes for device %s (id=%d) — "
+                    "cannot create entities; check device connectivity",
+                    device.device_name,
+                    device.device_id,
+                )
+                raise ConfigEntryNotReady(
+                    f"No attributes discovered for device {device.device_name!r}"
+                )
             self._attribute_catalog[device.device_id] = catalog
             _LOGGER.info(
                 "Discovered %d attributes for %s",
