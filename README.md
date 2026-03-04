@@ -189,6 +189,15 @@ pip install -r scripts/requirements.txt
 python scripts/discover.py --user YOUR_EMAIL --password YOUR_PASSWORD --values
 ```
 
+## Removal
+
+1. Go to **Settings** > **Devices & Services**
+2. Find **Viessmann Vitotrol** and click the three-dot menu
+3. Select **Delete**
+4. All entities and device entries are removed automatically
+5. If you installed via HACS, open HACS, find the integration, and click **Remove**; otherwise, delete the `custom_components/vitotrol` folder from your HA config directory
+6. Restart Home Assistant
+
 ## Contributing
 
 The easiest way to contribute is sharing your device's attribute catalog (see above). The [contributor guide](docs/contributing.md) walks through adding attributes — it's a one-line table addition per attribute.
