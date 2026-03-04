@@ -1,0 +1,104 @@
+# Requirements: Vitotrol HASS
+
+**Defined:** 2026-03-04
+**Core Value:** Users with Viessmann boilers can monitor and control their heating system natively in Home Assistant, with automatic attribute discovery and no manual datapoint configuration.
+
+## v1 Requirements
+
+Requirements for the v1.0.0 HACS release. Each maps to roadmap phases.
+
+### Bug Fixes
+
+- [ ] **BUGS-01**: Integration reverts entity state to actual device value when WriteData fails or times out (no indefinite stale optimistic state)
+- [ ] **BUGS-02**: WriteData value formatted correctly — strip `.0` suffix for integers (`"20.0"` → `"20"`), preserve decimals (`"20.5"` → `"20.5"`); no SOAP FormatException
+- [ ] **BUGS-03**: Number entity step size derived from GetTypeInfo metadata instead of hardcoded `1.0`
+- [ ] **BUGS-04**: Climate preset writes check `writable` flag before attempting write to eco_mode/party_mode attributes; read-only attributes skipped with warning log
+- [ ] **BUGS-05**: All entity write operations (climate, switch, number, select) raise `HomeAssistantError` or `ServiceValidationError` on failure, producing user-visible HA error toasts
+- [ ] **BUGS-06**: Authentication failures in coordinator polling raise `ConfigEntryAuthFailed`, triggering HA's built-in reauth flow
+- [ ] **BUGS-07**: Empty GetTypeInfo catalog (zero attributes returned) logs a warning and raises `ConfigEntryNotReady` rather than silently creating zero entities
+
+### HA Patterns
+
+- [ ] **HAPAT-01**: `VitotrolCoordinator` receives `config_entry` as constructor parameter and passes it to `DataUpdateCoordinator.__init__`
+- [ ] **HAPAT-02**: Config flow surfaces distinct error messages for auth failure, network error, and no-devices-found cases
+
+### Test Coverage
+
+- [ ] **TEST-01**: Pytest GitHub Actions workflow runs on push, pull_request, and weekly schedule; badge shown in README
+- [ ] **TEST-02**: Test covers optimistic state rollback when WriteData raises exception
+- [ ] **TEST-03**: Test covers GetTypeInfo response with malformed/empty enum values
+- [ ] **TEST-04**: Test covers config flow behavior when GetDevices returns empty device list
+- [ ] **TEST-05**: Test covers concurrent write operations completing independently
+
+### Release Pipeline
+
+- [ ] **REL-01**: GitHub Actions release workflow auto-creates GitHub Release when a `v*` tag is pushed
+- [ ] **REL-02**: `manifest.json` version set to `1.0.0`
+- [ ] **REL-03**: First GitHub Release `v1.0.0` published with changelog
+
+### HACS Submission
+
+- [ ] **HACS-01**: `brand/logo.png` and `brand/logo@2x.png` created (landscape Viessmann/Vitotrol, no HA branding)
+- [ ] **HACS-02**: GitHub repository description and topics set (e.g., `home-assistant`, `viessmann`, `vitotrol`, `hacs-integration`)
+- [ ] **HACS-03**: README enhanced with HACS install badge, step-by-step install instructions, supported platforms, and known limitations (single session, 10–15s refresh)
+- [ ] **HACS-04**: PR submitted to `hacs/default` repository
+- [ ] **HACS-05**: PR submitted to `home-assistant/brands` for `custom_integrations/vitotrol`
+
+## v1.x Requirements
+
+Scoped for a point release after v1.0.0 has been stable for 2–4 weeks.
+
+### Enhancements
+
+- **ENH-01**: HA service `vitotrol.refresh_data` triggers an immediate out-of-cycle coordinator refresh for a device
+- **ENH-02**: Device registry entry populated with manufacturer, model, and firmware version sourced from the Viessmann API (requires investigation of what GetDevices/GetTypeInfo actually returns)
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| German translations | v2 — English sufficient for v1 global release |
+| Concurrent session handling | API limitation — Viessmann allows one session per account |
+| Entity grouping by heating circuit | HA UI concern — users can group via dashboards |
+| Session timeout enforcement (24h re-login) | Low priority — re-auth on error is sufficient |
+| Local/LAN API | No local API known to exist for Vitotrol systems |
+| Mobile app | Web/HA only |
+| Value history / trend analysis | Handled by HA built-in history |
+
+## Traceability
+
+Populated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| BUGS-01 | — | Pending |
+| BUGS-02 | — | Pending |
+| BUGS-03 | — | Pending |
+| BUGS-04 | — | Pending |
+| BUGS-05 | — | Pending |
+| BUGS-06 | — | Pending |
+| BUGS-07 | — | Pending |
+| HAPAT-01 | — | Pending |
+| HAPAT-02 | — | Pending |
+| TEST-01 | — | Pending |
+| TEST-02 | — | Pending |
+| TEST-03 | — | Pending |
+| TEST-04 | — | Pending |
+| TEST-05 | — | Pending |
+| REL-01 | — | Pending |
+| REL-02 | — | Pending |
+| REL-03 | — | Pending |
+| HACS-01 | — | Pending |
+| HACS-02 | — | Pending |
+| HACS-03 | — | Pending |
+| HACS-04 | — | Pending |
+| HACS-05 | — | Pending |
+
+**Coverage:**
+- v1 requirements: 22 total
+- Mapped to phases: 0
+- Unmapped: 22 ⚠️
+
+---
+*Requirements defined: 2026-03-04*
+*Last updated: 2026-03-04 after initial definition*
