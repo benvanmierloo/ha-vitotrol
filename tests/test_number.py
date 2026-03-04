@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
+import pytest
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -134,3 +136,106 @@ async def test_number_invalid_data_state_unknown(
     state = hass.states.get("number.vitovalor_300_p_hot_water_setpoint_temperature")
     assert state is not None
     assert state.state == STATE_UNKNOWN
+
+
+# ---------------------------------------------------------------------------
+# Step size from attribute type (BUGS-03)
+# ---------------------------------------------------------------------------
+
+FAKE_INTEGER_SETPOINT_INFO = AttributeTypeInfo(
+    attr_id=82,
+    name="TempNormBetrieb",
+    type="Integer",
+    type_value="2",
+    min_value="10",
+    max_value="30",
+    unit="°C",
+    group="Heizkreis",
+    heating_circuit_id=None,
+    factory_default=None,
+    readable=True,
+    writable=True,
+    enum_values=None,
+)
+
+
+async def test_double_attr_has_step_0_5(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """Double-type number entity has native_step=0.5 and suggested_display_precision=1."""
+    mock_api.return_value.get_type_info = AsyncMock(return_value={51: FAKE_HW_SETPOINT_INFO})
+    mock_api.return_value.get_data = AsyncMock(return_value={51: "55.0"})
+
+    await _load(hass, mock_config_entry)
+
+    state = hass.states.get("number.vitovalor_300_p_hot_water_setpoint_temperature")
+    assert state is not None
+    assert float(state.attributes["step"]) == 0.5
+
+
+async def test_integer_attr_has_step_1_0(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """Integer-type number entity has native_step=1.0."""
+    mock_api.return_value.get_type_info = AsyncMock(return_value={82: FAKE_INTEGER_SETPOINT_INFO})
+    mock_api.return_value.get_data = AsyncMock(return_value={82: "21"})
+
+    await _load(hass, mock_config_entry)
+
+    state = hass.states.get("number.vitovalor_300_p_heat_normal_temperature")
+    assert state is not None
+    assert float(state.attributes["step"]) == 1.0
+
+
+async def test_double_native_value_returns_float(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """Double-type number entity returns float native_value (not int-truncated)."""
+    mock_api.return_value.get_type_info = AsyncMock(return_value={51: FAKE_HW_SETPOINT_INFO})
+    mock_api.return_value.get_data = AsyncMock(return_value={51: "20.5"})
+
+    await _load(hass, mock_config_entry)
+
+    state = hass.states.get("number.vitovalor_300_p_hot_water_setpoint_temperature")
+    assert state is not None
+    # State string for a float should include decimal representation
+    assert state.state == "20.5"
+
+
+async def test_integer_native_value_returns_int(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """Integer-type number entity returns int native_value (no .0 suffix)."""
+    mock_api.return_value.get_type_info = AsyncMock(return_value={82: FAKE_INTEGER_SETPOINT_INFO})
+    mock_api.return_value.get_data = AsyncMock(return_value={82: "21"})
+
+    await _load(hass, mock_config_entry)
+
+    state = hass.states.get("number.vitovalor_300_p_heat_normal_temperature")
+    assert state is not None
+    assert state.state == "21"
+
+
+async def test_set_value_rollback_on_write_failure(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """async_set_native_value raises HomeAssistantError and reverts state on write failure."""
+    mock_api.return_value.get_type_info = AsyncMock(return_value={51: FAKE_HW_SETPOINT_INFO})
+    mock_api.return_value.get_data = AsyncMock(return_value={51: "50.0"})
+    mock_api.return_value.write_data_wait = AsyncMock(side_effect=Exception("SOAP fault"))
+
+    await _load(hass, mock_config_entry)
+
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "number",
+            "set_value",
+            {
+                "entity_id": "number.vitovalor_300_p_hot_water_setpoint_temperature",
+                "value": 55.0,
+            },
+            blocking=True,
+        )
+
+    state = hass.states.get("number.vitovalor_300_p_hot_water_setpoint_temperature")
+    assert state.state == "50.0", f"Expected '50.0' after rollback, got {state.state!r}"
