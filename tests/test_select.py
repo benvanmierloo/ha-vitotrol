@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
+import pytest
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 
@@ -148,3 +150,42 @@ async def test_unknown_multi_select_registered(
     assert entity_id is not None
     entry = ent_reg.async_get(entity_id)
     assert entry.disabled_by == RegistryEntryDisabler.INTEGRATION
+
+
+async def test_select_option_rollback_on_write_failure(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """async_select_option raises HomeAssistantError and reverts state on write failure."""
+    mock_api.return_value.get_type_info = AsyncMock(
+        return_value={92: FAKE_OPERATING_MODE_INFO}
+    )
+    mock_api.return_value.get_data = AsyncMock(return_value={92: "2"})
+    mock_api.return_value.write_data_wait = AsyncMock(side_effect=Exception("SOAP fault"))
+
+    await _load(hass, mock_config_entry)
+
+    # Enable the entity and reload
+    ent_reg = er.async_get(hass)
+    ent_reg.async_update_entity(
+        "select.vitovalor_300_p_operating_mode", disabled_by=None
+    )
+    await hass.config_entries.async_reload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    mock_api.return_value.write_data_wait = AsyncMock(side_effect=Exception("SOAP fault"))
+
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "select",
+            "select_option",
+            {
+                "entity_id": "select.vitovalor_300_p_operating_mode",
+                "option": "Off",
+            },
+            blocking=True,
+        )
+
+    state = hass.states.get("select.vitovalor_300_p_operating_mode")
+    assert state.state == "Heating + DHW", (
+        f"Expected state to revert to 'Heating + DHW', got {state.state!r}"
+    )

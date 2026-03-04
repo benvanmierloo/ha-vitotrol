@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
+import pytest
 from homeassistant.components.climate import HVACMode
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -483,3 +485,141 @@ async def test_climate_set_preset_none_clears_party(
     )
 
     mock_api.return_value.write_data_wait.assert_called_with(FAKE_DEVICE, 7855, "0")
+
+
+# ---------------------------------------------------------------------------
+# Rollback + HomeAssistantError tests (BUGS-03 / BUGS-04)
+# ---------------------------------------------------------------------------
+
+async def test_set_temperature_rollback_on_failure(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """async_set_temperature raises HomeAssistantError and reverts temp state on failure."""
+    mock_api.return_value.get_type_info = AsyncMock(
+        return_value={92: FAKE_OPERATING_MODE_INFO}
+    )
+    mock_api.return_value.get_data = AsyncMock(
+        return_value={92: "2", 5367: "20.0", 82: "21.0"}
+    )
+
+    await _load(hass, mock_config_entry)
+    mock_api.return_value.write_data_wait = AsyncMock(side_effect=Exception("SOAP fault"))
+
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "climate",
+            "set_temperature",
+            {"entity_id": "climate.vitovalor_300_p_heating", "temperature": 22.0},
+            blocking=True,
+        )
+
+    state = hass.states.get("climate.vitovalor_300_p_heating")
+    assert state.attributes["temperature"] == 21.0, (
+        f"Expected temp 21.0 after rollback, got {state.attributes.get('temperature')!r}"
+    )
+
+
+async def test_set_hvac_mode_rollback_on_failure(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """async_set_hvac_mode raises HomeAssistantError and reverts mode on failure."""
+    mock_api.return_value.get_type_info = AsyncMock(
+        return_value={92: FAKE_OPERATING_MODE_INFO}
+    )
+    mock_api.return_value.get_data = AsyncMock(return_value={92: "2"})
+
+    await _load(hass, mock_config_entry)
+    mock_api.return_value.write_data_wait = AsyncMock(side_effect=Exception("SOAP fault"))
+
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "climate",
+            "set_hvac_mode",
+            {"entity_id": "climate.vitovalor_300_p_heating", "hvac_mode": HVACMode.OFF},
+            blocking=True,
+        )
+
+    state = hass.states.get("climate.vitovalor_300_p_heating")
+    assert state.state == HVACMode.AUTO, (
+        f"Expected mode to revert to AUTO, got {state.state!r}"
+    )
+
+
+async def test_set_preset_mode_rollback_on_failure(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """async_set_preset_mode raises HomeAssistantError and reverts all attrs on failure."""
+    eco_info = AttributeTypeInfo(
+        attr_id=7852,
+        name="EnergySpar_Betrieb",
+        type="ENUM",
+        type_value="1",
+        min_value=None,
+        max_value=None,
+        unit=None,
+        group="Allgemein",
+        heating_circuit_id=None,
+        factory_default=None,
+        readable=True,
+        writable=True,
+        enum_values=None,
+    )
+    mock_api.return_value.get_type_info = AsyncMock(
+        return_value={92: FAKE_OPERATING_MODE_INFO, 7852: eco_info}
+    )
+    mock_api.return_value.get_data = AsyncMock(return_value={92: "2", 7852: "0"})
+
+    await _load(hass, mock_config_entry)
+    mock_api.return_value.write_data_wait = AsyncMock(side_effect=Exception("SOAP fault"))
+
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "climate",
+            "set_preset_mode",
+            {"entity_id": "climate.vitovalor_300_p_heating", "preset_mode": "eco"},
+            blocking=True,
+        )
+
+    state = hass.states.get("climate.vitovalor_300_p_heating")
+    assert state.attributes["preset_mode"] == "none", (
+        f"Expected preset_mode to revert to none, got {state.attributes.get('preset_mode')!r}"
+    )
+
+
+async def test_set_preset_mode_skips_readonly_eco(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """async_set_preset_mode skips read-only eco_mode attr with warning log, does not raise."""
+    eco_info = AttributeTypeInfo(
+        attr_id=7852,
+        name="EnergySpar_Betrieb",
+        type="ENUM",
+        type_value="1",
+        min_value=None,
+        max_value=None,
+        unit=None,
+        group="Allgemein",
+        heating_circuit_id=None,
+        factory_default=None,
+        readable=True,
+        writable=False,  # read-only!
+        enum_values=None,
+    )
+    mock_api.return_value.get_type_info = AsyncMock(
+        return_value={92: FAKE_OPERATING_MODE_INFO, 7852: eco_info}
+    )
+    mock_api.return_value.get_data = AsyncMock(return_value={92: "2", 7852: "0"})
+
+    await _load(hass, mock_config_entry)
+    mock_api.return_value.write_data_wait.reset_mock()
+
+    # Should NOT raise even though eco_mode attr is read-only
+    await hass.services.async_call(
+        "climate",
+        "set_preset_mode",
+        {"entity_id": "climate.vitovalor_300_p_heating", "preset_mode": "eco"},
+        blocking=True,
+    )
+
+    # write_data_wait should NOT be called for the read-only attr
+    mock_api.return_value.write_data_wait.assert_not_called()
