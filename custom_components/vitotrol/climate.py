@@ -13,6 +13,7 @@ from homeassistant.components.climate import (
 )
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import VitotrolConfigEntry
@@ -190,11 +191,20 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
             return
 
         temp = max(self._attr_min_temp, min(self._attr_max_temp, float(temp)))
-
-        await self.coordinator.async_write(
-            self._device, self._cfg.target_temp_attr, str(temp)
-        )
-        self._update_coordinator_data(self._cfg.target_temp_attr, str(temp))
+        str_temp = str(temp)
+        old_value = self._get_attr_value(self._cfg.target_temp_attr)
+        try:
+            await self.coordinator.async_write(
+                self._device, self._cfg.target_temp_attr, str_temp
+            )
+        except Exception as err:
+            if old_value is not None:
+                self._update_coordinator_data(self._cfg.target_temp_attr, old_value)
+            self.async_write_ha_state()
+            raise HomeAssistantError(
+                f"Failed to set temperature for {self._device.device_name}: {err}"
+            ) from err
+        self._update_coordinator_data(self._cfg.target_temp_attr, str_temp)
         self.async_write_ha_state()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
@@ -203,9 +213,18 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
         if value is None:
             return
 
-        await self.coordinator.async_write(
-            self._device, self._cfg.operating_mode_attr, value
-        )
+        old_value = self._get_attr_value(self._cfg.operating_mode_attr)
+        try:
+            await self.coordinator.async_write(
+                self._device, self._cfg.operating_mode_attr, value
+            )
+        except Exception as err:
+            if old_value is not None:
+                self._update_coordinator_data(self._cfg.operating_mode_attr, old_value)
+            self.async_write_ha_state()
+            raise HomeAssistantError(
+                f"Failed to set HVAC mode for {self._device.device_name}: {err}"
+            ) from err
         self._update_coordinator_data(self._cfg.operating_mode_attr, value)
         self.async_write_ha_state()
 
@@ -214,40 +233,65 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
         eco_attr = self._cfg.eco_mode_attr
         party_attr = self._cfg.party_mode_attr
 
-        if preset_mode == PRESET_ECO and eco_attr is not None:
-            if party_attr is not None and self._get_attr_value(party_attr) == "1":
-                await self.coordinator.async_write(
-                    self._device, party_attr, "0"
+        # Check writable flags — skip read-only attrs with a warning (no error raised)
+        catalog = self.coordinator.get_attribute_catalog(self._device.device_id)
+        if eco_attr is not None:
+            eco_info = catalog.get(eco_attr)
+            if eco_info is not None and not eco_info.writable:
+                _LOGGER.warning(
+                    "Climate %s: eco_mode attr %d is read-only — skipping write",
+                    self._device.device_name,
+                    eco_attr,
                 )
-            await self.coordinator.async_write(
-                self._device, eco_attr, "1"
-            )
-            if party_attr is not None:
-                self._update_coordinator_data(party_attr, "0")
-            self._update_coordinator_data(eco_attr, "1")
+                eco_attr = None
+        if party_attr is not None:
+            party_info = catalog.get(party_attr)
+            if party_info is not None and not party_info.writable:
+                _LOGGER.warning(
+                    "Climate %s: party_mode attr %d is read-only — skipping write",
+                    self._device.device_name,
+                    party_attr,
+                )
+                party_attr = None
 
-        elif preset_mode == PRESET_PARTY and party_attr is not None:
-            if eco_attr is not None and self._get_attr_value(eco_attr) == "1":
-                await self.coordinator.async_write(
-                    self._device, eco_attr, "0"
-                )
-            await self.coordinator.async_write(
-                self._device, party_attr, "1"
-            )
-            if eco_attr is not None:
-                self._update_coordinator_data(eco_attr, "0")
-            self._update_coordinator_data(party_attr, "1")
+        # Capture pre-write state for rollback
+        old_eco = self._get_attr_value(eco_attr) if eco_attr is not None else None
+        old_party = self._get_attr_value(party_attr) if party_attr is not None else None
 
-        elif preset_mode == PRESET_NONE:
-            if eco_attr is not None and self._get_attr_value(eco_attr) == "1":
-                await self.coordinator.async_write(
-                    self._device, eco_attr, "0"
-                )
-                self._update_coordinator_data(eco_attr, "0")
-            if party_attr is not None and self._get_attr_value(party_attr) == "1":
-                await self.coordinator.async_write(
-                    self._device, party_attr, "0"
-                )
-                self._update_coordinator_data(party_attr, "0")
+        try:
+            if preset_mode == PRESET_ECO and eco_attr is not None:
+                if party_attr is not None and self._get_attr_value(party_attr) == "1":
+                    await self.coordinator.async_write(self._device, party_attr, "0")
+                await self.coordinator.async_write(self._device, eco_attr, "1")
+                if party_attr is not None:
+                    self._update_coordinator_data(party_attr, "0")
+                self._update_coordinator_data(eco_attr, "1")
+
+            elif preset_mode == PRESET_PARTY and party_attr is not None:
+                if eco_attr is not None and self._get_attr_value(eco_attr) == "1":
+                    await self.coordinator.async_write(self._device, eco_attr, "0")
+                await self.coordinator.async_write(self._device, party_attr, "1")
+                if eco_attr is not None:
+                    self._update_coordinator_data(eco_attr, "0")
+                self._update_coordinator_data(party_attr, "1")
+
+            elif preset_mode == PRESET_NONE:
+                if eco_attr is not None and self._get_attr_value(eco_attr) == "1":
+                    await self.coordinator.async_write(self._device, eco_attr, "0")
+                    self._update_coordinator_data(eco_attr, "0")
+                if party_attr is not None and self._get_attr_value(party_attr) == "1":
+                    await self.coordinator.async_write(self._device, party_attr, "0")
+                    self._update_coordinator_data(party_attr, "0")
+
+        except Exception as err:
+            # Restore all attrs that may have been touched
+            if eco_attr is not None and old_eco is not None:
+                self._update_coordinator_data(eco_attr, old_eco)
+            if party_attr is not None and old_party is not None:
+                self._update_coordinator_data(party_attr, old_party)
+            self.async_write_ha_state()
+            raise HomeAssistantError(
+                f"Failed to set preset mode for {self._device.device_name}: {err}"
+            ) from err
 
         self.async_write_ha_state()

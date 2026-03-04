@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import VitotrolConfigEntry
@@ -99,8 +100,17 @@ class VitotrolSelect(VitotrolEntity, SelectEntity):
         if raw_value is None:
             return
 
-        await self.coordinator.async_write(
-            self._device, self._vitotrol_attr_id, raw_value
-        )
+        old_value = self._get_attr_value(self._vitotrol_attr_id)
+        try:
+            await self.coordinator.async_write(
+                self._device, self._vitotrol_attr_id, raw_value
+            )
+        except Exception as err:
+            if old_value is not None:
+                self._update_coordinator_data(self._vitotrol_attr_id, old_value)
+            self.async_write_ha_state()
+            raise HomeAssistantError(
+                f"Failed to select option for {self._attr_name} (attr {self._vitotrol_attr_id}): {err}"
+            ) from err
         self._update_coordinator_data(self._vitotrol_attr_id, raw_value)
         self.async_write_ha_state()
