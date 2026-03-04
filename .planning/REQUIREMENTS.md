@@ -9,11 +9,11 @@ Requirements for the v1.0.0 HACS release. Each maps to roadmap phases.
 
 ### Bug Fixes
 
-- [ ] **BUGS-01**: Integration reverts entity state to actual device value when WriteData fails or times out (no indefinite stale optimistic state)
+- [x] **BUGS-01**: Integration reverts entity state to actual device value when WriteData fails or times out (no indefinite stale optimistic state)
 - [x] **BUGS-02**: WriteData value formatted correctly — strip `.0` suffix for integers (`"20.0"` → `"20"`), preserve decimals (`"20.5"` → `"20.5"`); no SOAP FormatException
-- [ ] **BUGS-03**: Number entity step size derived from GetTypeInfo metadata instead of hardcoded `1.0`
-- [ ] **BUGS-04**: Climate preset writes check `writable` flag before attempting write to eco_mode/party_mode attributes; read-only attributes skipped with warning log
-- [ ] **BUGS-05**: All entity write operations (climate, switch, number, select) raise `HomeAssistantError` or `ServiceValidationError` on failure, producing user-visible HA error toasts
+- [x] **BUGS-03**: Number entity step size derived from GetTypeInfo metadata instead of hardcoded `1.0`
+- [x] **BUGS-04**: Climate preset writes check `writable` flag before attempting write to eco_mode/party_mode attributes; read-only attributes skipped with warning log
+- [x] **BUGS-05**: All entity write operations (climate, switch, number, select) raise `HomeAssistantError` or `ServiceValidationError` on failure, producing user-visible HA error toasts
 - [x] **BUGS-06**: Authentication failures in coordinator polling raise `ConfigEntryAuthFailed`, triggering HA's built-in reauth flow
 - [x] **BUGS-07**: Empty GetTypeInfo catalog (zero attributes returned) logs a warning and raises `ConfigEntryNotReady` rather than silently creating zero entities
 
@@ -74,11 +74,11 @@ Scoped for a point release after v1.0.0 has been stable for 2-4 weeks.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUGS-01 | Phase 1 | Pending |
+| BUGS-01 | Phase 1 | Complete |
 | BUGS-02 | Phase 1 | Complete |
-| BUGS-03 | Phase 1 | Pending |
-| BUGS-04 | Phase 1 | Pending |
-| BUGS-05 | Phase 1 | Pending |
+| BUGS-03 | Phase 1 | Complete |
+| BUGS-04 | Phase 1 | Complete |
+| BUGS-05 | Phase 1 | Complete |
 | BUGS-06 | Phase 1 | Complete |
 | BUGS-07 | Phase 1 | Complete |
 | HAPAT-01 | Phase 1 | Complete |

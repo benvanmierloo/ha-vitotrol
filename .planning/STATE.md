@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-code-quality-02-PLAN.md
-last_updated: "2026-03-04T19:01:25Z"
-last_activity: 2026-03-04 — Fixed WriteData value truncation bug (BUGS-02)
+stopped_at: Completed 01-code-quality-03-PLAN.md
+last_updated: "2026-03-04T19:40:00Z"
+last_activity: 2026-03-04 — Applied optimistic-rollback + HomeAssistantError to all write platforms (BUGS-01, BUGS-03, BUGS-04, BUGS-05)
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 1 of 2 (Code Quality)
-Plan: 2 of 4 total plans complete
+Plan: 3 of 4 total plans complete
 Status: In progress
-Last activity: 2026-03-04 — Fixed WriteData value truncation bug (BUGS-02)
+Last activity: 2026-03-04 — Applied optimistic-rollback + HomeAssistantError to all write platforms (BUGS-01, BUGS-03, BUGS-04, BUGS-05)
 
-Progress: [█████░░░░░] 50%
+Progress: [███████░░░] 75%
 
 ## Performance Metrics
 
@@ -66,6 +66,9 @@ Recent decisions affecting current work:
 - [Phase 01-code-quality]: Split inner except in auth retry: persistent VitotrolAuthError raises ConfigEntryAuthFailed (not UpdateFailed) so HA triggers reauth flow
 - [Phase 01-code-quality]: ConfigEntryNotReady from async_setup_type_info propagates through __init__.py VitotrolError guard naturally (not a subclass)
 - [Phase 01-code-quality P02]: _format_wire_value returns original string for non-whole-number floats to avoid float-to-string precision artifacts
+- [Phase 01-code-quality P03]: Rollback via _update_coordinator_data(old_value) + async_write_ha_state() restores entity state immediately without waiting for next poll cycle
+- [Phase 01-code-quality P03]: Number.native_value returns float for Double, int for Integer; write passes str(float) for Double, str(int) for Integer; api.py strips .0 for wire
+- [Phase 01-code-quality P03]: Climate preset guard silently skips read-only eco/party attrs with warning log — partial presets are valid UX for devices that report attrs as RO
 
 ### Pending Todos
 
@@ -78,6 +81,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T19:01:25Z
-Stopped at: Completed 01-code-quality-02-PLAN.md
+Last session: 2026-03-04T19:40:00Z
+Stopped at: Completed 01-code-quality-03-PLAN.md
 Resume file: None
