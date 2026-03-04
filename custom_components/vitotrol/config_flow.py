@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Mapping
 
 import aiohttp
 import voluptuous as vol
@@ -83,6 +83,49 @@ class VitotrolConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=USER_SCHEMA,
             errors=errors,
+        )
+
+    async def async_step_reauth(
+        self, entry_data: Mapping[str, Any]
+    ) -> ConfigFlowResult:
+        """Handle reauthentication — called automatically by HA when re-auth is needed."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show a form to re-enter the password."""
+        errors: dict[str, str] = {}
+        reauth_entry = self._get_reauth_entry()
+
+        if user_input is not None:
+            session = async_get_clientsession(self.hass)
+            api = VitotrolAPI(
+                username=reauth_entry.data[CONF_USERNAME],
+                password=user_input[CONF_PASSWORD],
+                session=session,
+            )
+            try:
+                await api.login()
+            except VitotrolAuthError as err:
+                _LOGGER.warning("Reauthentication failed: %s", err)
+                errors["base"] = "invalid_auth"
+            except (VitotrolError, aiohttp.ClientError) as err:
+                _LOGGER.error("Connection error during reauth: %s", err)
+                errors["base"] = "cannot_connect"
+            else:
+                return self.async_update_reload_and_abort(
+                    reauth_entry,
+                    data={**reauth_entry.data, CONF_PASSWORD: user_input[CONF_PASSWORD]},
+                )
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            errors=errors,
+            description_placeholders={
+                "username": reauth_entry.data[CONF_USERNAME]
+            },
         )
 
     @staticmethod
