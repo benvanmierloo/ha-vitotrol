@@ -39,19 +39,24 @@ Requirements for the v1.0.0 HACS release. Each maps to roadmap phases.
 ### HACS Submission
 
 - [ ] **HACS-01**: `brand/logo.png` and `brand/logo@2x.png` created (landscape Viessmann/Vitotrol, no HA branding)
-- [ ] **HACS-02**: GitHub repository description and topics set (e.g., `home-assistant`, `viessmann`, `vitotrol`, `hacs-integration`)
-- [ ] **HACS-03**: README enhanced with HACS install badge, step-by-step install instructions, supported platforms, and known limitations (single session, 10–15s refresh)
-- [ ] **HACS-04**: PR submitted to `hacs/default` repository
-- [ ] **HACS-05**: PR submitted to `home-assistant/brands` for `custom_integrations/vitotrol`
+- [ ] **HACS-03**: README quality check — verify HACS install badge, install instructions, supported platforms, and known limitations are present and accurate
 
 ## v1.x Requirements
 
-Scoped for a point release after v1.0.0 has been stable for 2–4 weeks.
+Scoped for a point release after v1.0.0 has been stable for 2-4 weeks.
 
 ### Enhancements
 
 - **ENH-01**: HA service `vitotrol.refresh_data` triggers an immediate out-of-cycle coordinator refresh for a device
 - **ENH-02**: Device registry entry populated with manufacturer, model, and firmware version sourced from the Viessmann API (requires investigation of what GetDevices/GetTypeInfo actually returns)
+
+## Already Complete / Not Needed
+
+| Requirement | Original ID | Status | Notes |
+|-------------|-------------|--------|-------|
+| GitHub repository description and topics set | HACS-02 | Done | Repo already has description and topics |
+| PR submitted to `hacs/default` repository | HACS-04 | Done | PR already submitted |
+| PR submitted to `home-assistant/brands` | HACS-05 | Not needed | HA 2026.3 serves brand assets from the repo's `brand/` directory directly |
 
 ## Out of Scope
 
@@ -67,38 +72,34 @@ Scoped for a point release after v1.0.0 has been stable for 2–4 weeks.
 
 ## Traceability
 
-Populated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUGS-01 | — | Pending |
-| BUGS-02 | — | Pending |
-| BUGS-03 | — | Pending |
-| BUGS-04 | — | Pending |
-| BUGS-05 | — | Pending |
-| BUGS-06 | — | Pending |
-| BUGS-07 | — | Pending |
-| HAPAT-01 | — | Pending |
-| HAPAT-02 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| TEST-04 | — | Pending |
-| TEST-05 | — | Pending |
-| REL-01 | — | Pending |
-| REL-02 | — | Pending |
-| REL-03 | — | Pending |
-| HACS-01 | — | Pending |
-| HACS-02 | — | Pending |
-| HACS-03 | — | Pending |
-| HACS-04 | — | Pending |
-| HACS-05 | — | Pending |
+| BUGS-01 | Phase 1 | Pending |
+| BUGS-02 | Phase 1 | Pending |
+| BUGS-03 | Phase 1 | Pending |
+| BUGS-04 | Phase 1 | Pending |
+| BUGS-05 | Phase 1 | Pending |
+| BUGS-06 | Phase 1 | Pending |
+| BUGS-07 | Phase 1 | Pending |
+| HAPAT-01 | Phase 1 | Pending |
+| HAPAT-02 | Phase 1 | Pending |
+| TEST-01 | Phase 2 | Pending |
+| TEST-02 | Phase 1 | Pending |
+| TEST-03 | Phase 1 | Pending |
+| TEST-04 | Phase 1 | Pending |
+| TEST-05 | Phase 1 | Pending |
+| REL-01 | Phase 2 | Pending |
+| REL-02 | Phase 2 | Pending |
+| REL-03 | Phase 2 | Pending |
+| HACS-01 | Phase 2 | Pending |
+| HACS-03 | Phase 2 | Pending |
 
 **Coverage:**
-- v1 requirements: 22 total
-- Mapped to phases: 0
-- Unmapped: 22 ⚠️
+- v1 requirements: 19 total
+- Mapped to phases: 19
+- Unmapped: 0
+- Already complete / not needed: 3 (HACS-02, HACS-04, HACS-05)
 
 ---
 *Requirements defined: 2026-03-04*
-*Last updated: 2026-03-04 after initial definition*
+*Last updated: 2026-03-04 after roadmap revision*
