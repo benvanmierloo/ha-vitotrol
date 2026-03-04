@@ -6,7 +6,9 @@ import json
 import logging
 from datetime import timedelta
 
+from homeassistant.config_entries import ConfigEntry, ConfigEntryAuthFailed
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import AttributeTypeInfo, VitotrolAPI, VitotrolAuthError, VitotrolDevice, VitotrolError
@@ -69,12 +71,14 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
         api: VitotrolAPI,
         devices: list[VitotrolDevice],
         scan_interval: int = DEFAULT_SCAN_INTERVAL,
+        config_entry: ConfigEntry | None = None,
     ) -> None:
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
             update_interval=timedelta(seconds=scan_interval),
+            config_entry=config_entry,
         )
         self.api = api
         self.devices = devices
@@ -242,8 +246,12 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
             try:
                 await self.api.login()
                 return await self._do_update()
-            except VitotrolError as err:
-                raise UpdateFailed(f"Re-auth failed: {err}") from err
+            except VitotrolAuthError as retry_err:
+                raise ConfigEntryAuthFailed(
+                    f"Credentials invalid: {retry_err}"
+                ) from retry_err
+            except VitotrolError as retry_err:
+                raise UpdateFailed(f"Re-auth failed: {retry_err}") from retry_err
         except VitotrolError as err:
             # Try re-login once for any API error
             _LOGGER.debug("API error (%s), re-logging in and retrying", err)
