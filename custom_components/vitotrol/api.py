@@ -174,8 +174,14 @@ class VitotrolAPI:
             if "-" in raw_id:
                 # Enum value entry: "92-0" -> attr_id=92, index=0
                 parts = raw_id.split("-", 1)
-                attr_id = int(parts[0])
-                index = int(parts[1])
+                try:
+                    attr_id = int(parts[0])
+                    index = int(parts[1])
+                except ValueError:
+                    _LOGGER.warning(
+                        "GetTypeInfo: skipping malformed enum ID %r", raw_id
+                    )
+                    continue
                 label = _find_text_opt(dp, "MinimalWert") or str(index)
                 enum_values.setdefault(attr_id, {})[index] = label
                 continue

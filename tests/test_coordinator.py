@@ -238,6 +238,26 @@ async def test_non_empty_catalog_completes_normally(hass: HomeAssistant) -> None
     assert coord._attribute_catalog[FAKE_DEVICE.device_id] == {5373: FAKE_ATTR_INFO}
 
 
+async def test_concurrent_writes_complete_independently(hass: HomeAssistant) -> None:
+    """Two concurrent writes to different attrs complete without interfering."""
+    import asyncio
+
+    api = AsyncMock()
+    api.write_data_wait = AsyncMock(return_value=None)
+
+    coord = _make_coordinator(hass, api)
+
+    await asyncio.gather(
+        coord.async_write(FAKE_DEVICE, 7855, "1"),
+        coord.async_write(FAKE_DEVICE, 7852, "1"),
+    )
+
+    assert api.write_data_wait.call_count == 2
+    calls = {(c.args[1], c.args[2]) for c in api.write_data_wait.call_args_list}
+    assert (7855, "1") in calls
+    assert (7852, "1") in calls
+
+
 async def test_debug_catalog_logged(hass: HomeAssistant, caplog) -> None:
     """_log_attribute_catalog is called and logs JSON when DEBUG is enabled."""
     import logging
