@@ -100,7 +100,10 @@ def mock_api() -> Generator[MagicMock, None, None]:
     instance.login = AsyncMock()
     instance.get_devices = AsyncMock(return_value=[FAKE_DEVICE])
     instance.get_type_info = AsyncMock(return_value={5373: FAKE_ATTR_INFO})
-    instance.refresh_data_wait = AsyncMock(return_value={5373: "12.5"})
+    # refresh_data_wait triggers the device to refresh (returns None)
+    instance.refresh_data_wait = AsyncMock(return_value=None)
+    # get_data fetches the actual cached values after refresh
+    instance.get_data = AsyncMock(return_value={5373: "12.5"})
     instance.write_data_wait = AsyncMock()
 
     with patch(
