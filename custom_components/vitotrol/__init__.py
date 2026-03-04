@@ -53,7 +53,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: VitotrolConfigEntry) -> 
         raise ConfigEntryNotReady(f"Failed to connect: {err}") from err
 
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-    coordinator = VitotrolCoordinator(hass, api, devices, scan_interval)
+    coordinator = VitotrolCoordinator(hass, api, devices, scan_interval, config_entry=entry)
 
     # Discover all device attributes via GetTypeInfo
     try:
