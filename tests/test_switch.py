@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
+import pytest
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -126,3 +128,47 @@ async def test_unknown_binary_switch_registered(
     assert entity_id is not None
     entry = ent_reg.async_get(entity_id)
     assert entry.disabled_by == RegistryEntryDisabler.INTEGRATION
+
+
+async def test_turn_on_rollback_on_write_failure(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """When async_turn_on raises, entity state reverts to old value ('off') and HomeAssistantError is raised."""
+    mock_api.return_value.get_type_info = AsyncMock(return_value={7855: FAKE_PARTY_MODE_INFO})
+    mock_api.return_value.get_data = AsyncMock(return_value={7855: "0"})
+    mock_api.return_value.write_data_wait = AsyncMock(side_effect=Exception("SOAP fault"))
+
+    await _load(hass, mock_config_entry)
+
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "switch",
+            "turn_on",
+            {"entity_id": "switch.vitovalor_300_p_party_mode"},
+            blocking=True,
+        )
+
+    state = hass.states.get("switch.vitovalor_300_p_party_mode")
+    assert state.state == "off", f"Expected 'off' after rollback, got {state.state!r}"
+
+
+async def test_turn_off_rollback_on_write_failure(
+    hass: HomeAssistant, mock_api, mock_config_entry
+) -> None:
+    """When async_turn_off raises, entity state reverts to old value ('on') and HomeAssistantError is raised."""
+    mock_api.return_value.get_type_info = AsyncMock(return_value={7855: FAKE_PARTY_MODE_INFO})
+    mock_api.return_value.get_data = AsyncMock(return_value={7855: "1"})
+    mock_api.return_value.write_data_wait = AsyncMock(side_effect=Exception("SOAP fault"))
+
+    await _load(hass, mock_config_entry)
+
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "switch",
+            "turn_off",
+            {"entity_id": "switch.vitovalor_300_p_party_mode"},
+            blocking=True,
+        )
+
+    state = hass.states.get("switch.vitovalor_300_p_party_mode")
+    assert state.state == "on", f"Expected 'on' after rollback, got {state.state!r}"
