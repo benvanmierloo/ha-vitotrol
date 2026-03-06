@@ -1,0 +1,1215 @@
+{
+  "device_name": "VT 200 (HO1C)",
+  "attributes": {
+    "51": {
+      "name": "konf_ww_solltemp_rw",
+      "type": "Integer",
+      "type_value": "0",
+      "min": "10",
+      "max": "95",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "50",
+      "readable": true,
+      "writable": true
+    },
+    "76": {
+      "name": "zustand_partybetrieb_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "@@viessmann.eventvaluetype.BedienPartybetriebA1M1~0",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "77": {
+      "name": "zustand_partybetrieb_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "@@viessmann.eventvaluetype.BedienPartybetriebM2~0",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "79": {
+      "name": "konf_partysolltemp_rw",
+      "type": "Integer",
+      "type_value": "0",
+      "min": "4",
+      "max": "37",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "20",
+      "readable": true,
+      "writable": true
+    },
+    "80": {
+      "name": "konf_partysolltemp_rw",
+      "type": "Integer",
+      "type_value": "0",
+      "min": "4",
+      "max": "37",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "20",
+      "readable": true,
+      "writable": true
+    },
+    "82": {
+      "name": "konf_raumsolltemp_rw",
+      "type": "Integer",
+      "type_value": "0",
+      "min": "3",
+      "max": "37",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "20",
+      "readable": true,
+      "writable": true
+    },
+    "83": {
+      "name": "konf_raumsolltemp_rw",
+      "type": "Integer",
+      "type_value": "0",
+      "min": "3",
+      "max": "37",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "20",
+      "readable": true,
+      "writable": true
+    },
+    "85": {
+      "name": "konf_raumsolltemp_reduziert_rw",
+      "type": "Integer",
+      "type_value": "0",
+      "min": "3",
+      "max": "37",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "3",
+      "readable": true,
+      "writable": true
+    },
+    "86": {
+      "name": "konf_raumsolltemp_reduziert_rw",
+      "type": "Integer",
+      "type_value": "0",
+      "min": "3",
+      "max": "37",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "3",
+      "readable": true,
+      "writable": true
+    },
+    "88": {
+      "name": "zustand_sparbetrieb_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "@@viessmann.eventvaluetype.BedienSparbetriebA1M1~0",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "89": {
+      "name": "zustand_sparbetrieb_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "@@viessmann.eventvaluetype.BedienSparbetriebM2~0",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "92": {
+      "name": "konf_betriebsart_rw",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "@@viessmann.eventvaluetype.BedienteilBA_GWGA1~2",
+      "readable": true,
+      "writable": true,
+      "enum_values": {
+        "0": "Abschalt",
+        "1": "Nur WW",
+        "2": "Heizen + WW",
+        "3": "Dauernd Reduziert",
+        "4": "Dauernd Normal"
+      }
+    },
+    "94": {
+      "name": "konf_betriebsart_rw",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "@@viessmann.eventvaluetype.BedienteilBA_GWGM2~2",
+      "readable": true,
+      "writable": true,
+      "enum_values": {
+        "0": "Abschalt",
+        "1": "Nur WW",
+        "2": "Heizen + WW",
+        "3": "Dauernd Reduziert",
+        "4": "Dauernd Normal"
+      }
+    },
+    "104": {
+      "name": "anzahl_brennerstunden_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "111": {
+      "name": "anzahl_brennerstart_r",
+      "type": "Integer",
+      "type_value": "0",
+      "min": "0",
+      "max": "1193045",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": true
+    },
+    "245": {
+      "name": "zustand_interne_pumpe_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein",
+        "2": "Aus",
+        "3": "Ein"
+      }
+    },
+    "270": {
+      "name": "externe_umschaltung_ba_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "@@viessmann.eventvaluetype.ExtBetriebsartenumschaltung_A1M1~0",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "271": {
+      "name": "externe_umschaltung_ba_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "@@viessmann.eventvaluetype.ExtBetriebsartenumschaltung_M2~0",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "306": {
+      "name": "konf_ferien_start_rw",
+      "type": "Date",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "01.01.1970",
+      "readable": true,
+      "writable": true
+    },
+    "307": {
+      "name": "konf_ferien_start_rw",
+      "type": "Date",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "01.01.1970",
+      "readable": true,
+      "writable": true
+    },
+    "309": {
+      "name": "konf_ferien_ende_rw",
+      "type": "Date",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "01.01.1970",
+      "readable": true,
+      "writable": true
+    },
+    "310": {
+      "name": "konf_ferien_ende_rw",
+      "type": "Date",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "01.01.1970",
+      "readable": true,
+      "writable": true
+    },
+    "600": {
+      "name": "zustand_brenner_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "708": {
+      "name": "aktuelle_betriebsart_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Abschaltbetrieb",
+        "1": "Reduzierter Betrieb",
+        "2": "Normalbetrieb",
+        "3": "Dauernd Normalbetrieb"
+      }
+    },
+    "709": {
+      "name": "aktuelle_betriebsart_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Abschaltbetrieb",
+        "1": "Reduzierter Betrieb",
+        "2": "Normalbetrieb",
+        "3": "Dauernd Normalbetrieb"
+      }
+    },
+    "714": {
+      "name": "zustand_ferienprogramm_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "@@viessmann.eventvaluetype.HK_FerienbetriebA1M1~0",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "inaktiv",
+        "1": "aktiv"
+      }
+    },
+    "715": {
+      "name": "zustand_ferienprogramm_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "@@viessmann.eventvaluetype.HK_FerienbetriebM2~0",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "inaktiv",
+        "1": "aktiv"
+      }
+    },
+    "717": {
+      "name": "zustand_frostgefahr_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "inaktiv",
+        "1": "aktiv"
+      }
+    },
+    "718": {
+      "name": "zustand_frostgefahr_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "inaktiv",
+        "1": "aktiv"
+      }
+    },
+    "729": {
+      "name": "zustand_heizkreispumpe_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "730": {
+      "name": "zustand_heizkreispumpe_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "801": {
+      "name": "konf_heizungsschema_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "@@viessmann.eventvaluetype.K00_KonfiAnlagenschemaV300_V333~1",
+      "readable": true,
+      "writable": true,
+      "enum_values": {
+        "0": "Ohne Heizkreis/Speicher (Mehrkesselanlage)",
+        "1": "1 A1",
+        "2": "2 A1 + WW",
+        "3": "3 M2",
+        "4": "4 M2 + WW",
+        "5": "5 A1 + M2",
+        "6": "6 A1 + M2 + WW",
+        "7": "7 M2 + M3",
+        "8": "8 M2 + M3 + WW",
+        "9": "9 A1 + M2 + M3",
+        "10": "10 A1 + M2 + M3 + WW"
+      }
+    },
+    "865": {
+      "name": "zustand_wartung_rw",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "@@viessmann.eventvaluetype.K24_KonfiStatus_Wartung~0",
+      "readable": true,
+      "writable": true,
+      "enum_values": {
+        "0": "inaktiv",
+        "1": "aktiv"
+      }
+    },
+    "897": {
+      "name": "info_fehlerbyte_gfa_r",
+      "type": "Integer",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "949": {
+      "name": "konf_ww_solltemp_2_rw",
+      "type": "Integer",
+      "type_value": "0",
+      "min": "0",
+      "max": "95",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~WW",
+      "factory_default": "0",
+      "readable": true,
+      "writable": true
+    },
+    "990": {
+      "name": "konf_fehlermanager_rw",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "@@viessmann.eventvaluetype.K79_KonfiFehlerManagerV300_V333~1",
+      "readable": true,
+      "writable": true,
+      "enum_values": {
+        "0": "0 kein Manager",
+        "1": "1 Fehlermanager"
+      }
+    },
+    "2869": {
+      "name": "konf_neigung_rw",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0,2",
+      "max": "3,5",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "1,4",
+      "readable": true,
+      "writable": true
+    },
+    "2871": {
+      "name": "konf_neigung_rw",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0,2",
+      "max": "3,5",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "1,4",
+      "readable": true,
+      "writable": true
+    },
+    "2875": {
+      "name": "konf_niveau_rw",
+      "type": "Double",
+      "type_value": "0",
+      "min": "-13",
+      "max": "40",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "0",
+      "readable": true,
+      "writable": true
+    },
+    "2877": {
+      "name": "konf_niveau_rw",
+      "type": "Double",
+      "type_value": "0",
+      "min": "-13",
+      "max": "40",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "0",
+      "readable": true,
+      "writable": true
+    },
+    "4165": {
+      "name": "info_brenner_modulation_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "100",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "5272": {
+      "name": "temp_solar_kollektor_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "-20",
+      "max": "250",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "5273": {
+      "name": "zustand_solar_nachlade_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "@@viessmann.eventvaluetype.SolarNachlade~0",
+      "readable": true,
+      "writable": true,
+      "enum_values": {
+        "0": "inaktiv",
+        "1": "aktiv"
+      }
+    },
+    "5274": {
+      "name": "zustand_solarpumpe_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "@@viessmann.eventvaluetype.SolarPumpe~0",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "5276": {
+      "name": "temp_solar_speicher_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "127",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "5277": {
+      "name": "info_solarstunden_r",
+      "type": "Integer",
+      "type_value": "0",
+      "min": "0",
+      "max": "65536",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "5279": {
+      "name": "info_solarenergie_r",
+      "type": "Integer",
+      "type_value": "0",
+      "min": "0",
+      "max": "4294967296",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "5280": {
+      "name": "zustand_speicherladepumpe_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~WW",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "5367": {
+      "name": "temp_rts_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "127",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "20",
+      "readable": true,
+      "writable": false
+    },
+    "5372": {
+      "name": "temp_agt_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "500",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "5373": {
+      "name": "temp_ats_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "-60",
+      "max": "60",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "5374": {
+      "name": "temp_kts_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "127",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "5376": {
+      "name": "temp_rts_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "127",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "20",
+      "readable": true,
+      "writable": false
+    },
+    "5380": {
+      "name": "temp_hyd_weiche_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "150",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "5381": {
+      "name": "temp_ww_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "150",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~WW",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "5382": {
+      "name": "temp_auslauf_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "150",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~WW",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "5385": {
+      "name": "konf_uhrzeit_rw",
+      "type": "Date",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": true
+    },
+    "6053": {
+      "name": "temp_vts_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "127",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "7179": {
+      "name": "info_ww_charging_active_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~WW",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Ladung inaktiv",
+        "1": "in Ladung",
+        "2": "im Nachlauf"
+      }
+    },
+    "7181": {
+      "name": "zustand_zirkulationspumpe_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~WW",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "7184": {
+      "name": "aktuelle_fehler_r",
+      "type": "String",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": false
+    },
+    "7191": {
+      "name": "konf_schaltzeiten_hk_rw",
+      "type": "CircuitTime",
+      "type_value": "1",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "0x30B0FFFFFFFFFFFF30B0FFFFFFFFFFFF30B0FFFFFFFFFFFF30B0FFFFFFFFFFFF30B0FFFFFFFFFFFF30B0FFFFFFFFFFFF30B0FFFFFFFFFFFF",
+      "readable": true,
+      "writable": true
+    },
+    "7192": {
+      "name": "konf_schaltzeiten_ww_rw",
+      "type": "CircuitTime",
+      "type_value": "1",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~WW",
+      "factory_default": "0x2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF",
+      "readable": true,
+      "writable": true
+    },
+    "7193": {
+      "name": "konf_schaltzeiten_zp_rw",
+      "type": "CircuitTime",
+      "type_value": "1",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~WW",
+      "factory_default": "0x2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF",
+      "readable": true,
+      "writable": true
+    },
+    "7194": {
+      "name": "konf_schaltzeiten_hk_rw",
+      "type": "CircuitTime",
+      "type_value": "1",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "0x30B0FFFFFFFFFFFF30B0FFFFFFFFFFFF30B0FFFFFFFFFFFF30B0FFFFFFFFFFFF30B0FFFFFFFFFFFF30B0FFFFFFFFFFFF30B0FFFFFFFFFFFF",
+      "readable": true,
+      "writable": true
+    },
+    "7195": {
+      "name": "konf_schaltzeiten_ww_rw",
+      "type": "CircuitTime",
+      "type_value": "1",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "0x2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF",
+      "readable": true,
+      "writable": true
+    },
+    "7196": {
+      "name": "konf_schaltzeiten_zp_rw",
+      "type": "CircuitTime",
+      "type_value": "1",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "0x2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF2BB0FFFFFFFFFFFF",
+      "readable": true,
+      "writable": true
+    },
+    "7271": {
+      "name": "konf_solarregler_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "@@viessmann.eventvaluetype.K54_Solar_GWG_2010~0",
+      "readable": true,
+      "writable": true,
+      "enum_values": {
+        "0": "0 ohne",
+        "1": "1 Vitosolic 100",
+        "2": "2 Vitosolic 200",
+        "3": "3 Solarmodul SM1",
+        "4": "4 Solarmodul SM1 mit DT2"
+      }
+    },
+    "7852": {
+      "name": "konf_sparbetrieb_rw",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "@@viessmann.eventvaluetype.BedienSparbetriebA1M1~0",
+      "readable": true,
+      "writable": true,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "7853": {
+      "name": "konf_sparbetrieb_rw",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "@@viessmann.eventvaluetype.BedienSparbetriebM2~0",
+      "readable": true,
+      "writable": true,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "7855": {
+      "name": "konf_partybetrieb_rw",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "@@viessmann.eventvaluetype.BedienPartybetriebA1M1~0",
+      "readable": true,
+      "writable": true,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "7856": {
+      "name": "konf_partybetrieb_rw",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Heizkörper",
+      "factory_default": "@@viessmann.eventvaluetype.BedienPartybetriebM2~0",
+      "readable": true,
+      "writable": true,
+      "enum_values": {
+        "0": "Aus",
+        "1": "Ein"
+      }
+    },
+    "7895": {
+      "name": "info_solarertrag_0_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "4294967295",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "0",
+      "readable": true,
+      "writable": false
+    },
+    "7896": {
+      "name": "info_solarertrag_1_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "4294967295",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "0",
+      "readable": true,
+      "writable": false
+    },
+    "7897": {
+      "name": "info_solarertrag_2_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "4294967295",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "0",
+      "readable": true,
+      "writable": false
+    },
+    "7898": {
+      "name": "info_solarertrag_3_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "4294967295",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "0",
+      "readable": true,
+      "writable": false
+    },
+    "7899": {
+      "name": "info_solarertrag_4_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "4294967295",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "0",
+      "readable": true,
+      "writable": false
+    },
+    "7900": {
+      "name": "info_solarertrag_5_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "4294967295",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "0",
+      "readable": true,
+      "writable": false
+    },
+    "7901": {
+      "name": "info_solarertrag_6_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "4294967295",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "0",
+      "readable": true,
+      "writable": false
+    },
+    "7902": {
+      "name": "info_solarertrag_7_r",
+      "type": "Double",
+      "type_value": "0",
+      "min": "0",
+      "max": "4294967295",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~Solar",
+      "factory_default": "0",
+      "readable": true,
+      "writable": false
+    },
+    "7987": {
+      "name": "info_kennung_hk1_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "Fussbodenheizung",
+      "factory_default": "@@viessmann.eventvaluetype.HK_Kennung~0",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "Nicht vorhanden",
+        "1": "Direkter Kreis",
+        "2": "Mischerkreis"
+      }
+    },
+    "10761": {
+      "name": "info_sensorstatus_ww_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "viessmann.eventtypegroupHC.name.VScotHO1_72~WW",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "OK",
+        "1": "Kurzschluss",
+        "2": "Unterbrechung",
+        "3": "unbekannt",
+        "4": "unbekannt",
+        "5": "unbekannt",
+        "6": "Nicht vorhanden"
+      }
+    },
+    "10796": {
+      "name": "info_status_rts_1_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "OK",
+        "1": "Kurzschluss",
+        "2": "Unterbrechung",
+        "3": "unbekannt",
+        "4": "unbekannt",
+        "5": "unbekannt",
+        "6": "Nicht vorhanden"
+      }
+    },
+    "10797": {
+      "name": "info_status_rts_2_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "OK",
+        "1": "Kurzschluss",
+        "2": "Unterbrechung",
+        "3": "unbekannt",
+        "4": "unbekannt",
+        "5": "unbekannt",
+        "6": "Nicht vorhanden"
+      }
+    },
+    "10800": {
+      "name": "info_status_rts_3_r",
+      "type": "ENUM",
+      "type_value": "0",
+      "min": "",
+      "max": "",
+      "unit": "",
+      "group": "ecnsysEventTypeGroupHC~VScotHO1_72",
+      "factory_default": "",
+      "readable": true,
+      "writable": false,
+      "enum_values": {
+        "0": "OK",
+        "1": "Kurzschluss",
+        "2": "Unterbrechung",
+        "3": "unbekannt",
+        "4": "unbekannt",
+        "5": "unbekannt",
+        "6": "Nicht vorhanden"
+      }
+    }
+  }
+}
