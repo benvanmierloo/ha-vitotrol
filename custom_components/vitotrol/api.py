@@ -234,7 +234,9 @@ class VitotrolAPI:
         for dp in root.iter("WerteListe"):
             attr_id = int(_find_text(dp, "DatenpunktId"))
             value = _find_text(dp, "Wert")
-            data[attr_id] = value
+            # API returns commas as decimal separator (e.g. "1,5"); normalise
+            # to periods so Python float() and HA can parse them.
+            data[attr_id] = value.replace(",", ".")
 
         return data
 
@@ -359,8 +361,7 @@ class VitotrolAPI:
         - 0 ...... pending (not yet started)
         - 1, 3 ... in progress
         - 4 ...... success
-        - 9 ...... success (observed for some write operations)
-        - other ... unexpected / error
+        - other ... error (e.g. 9 = rejected value)
         """
         await asyncio.sleep(initial_wait)
 
@@ -370,9 +371,9 @@ class VitotrolAPI:
             status = await poll_fn(refresh_id)
 
             if status >= 4:
-                if status not in (4, 9):
+                if status != 4:
                     raise VitotrolError(
-                        f"{operation} failed with unexpected status {status}"
+                        f"{operation} failed with status {status}"
                     )
                 _LOGGER.debug("%s complete, status=%d", operation, status)
                 return
@@ -496,11 +497,11 @@ def _format_wire_value(value: str) -> str:
     """Format a value string for SOAP WriteData.
 
     The Vitotrol API server uses int.Parse() for Integer-type attributes
-    and parses period-separated decimals for Double-type attributes.
+    and comma-separated decimals for Double-type attributes.
 
     Rules:
-      - "20.0"  -> "20"   (whole number: strip trailing .0)
-      - "20.5"  -> "20.5" (meaningful decimal: preserve)
+      - "20.0"  -> "20"   (whole number: strip trailing .0 for int.Parse)
+      - "20.5"  -> "20,5" (decimal: replace period with comma)
       - "20"    -> "20"   (no decimal: passthrough)
     """
     if "." in value:
@@ -508,6 +509,7 @@ def _format_wire_value(value: str) -> str:
             f = float(value)
             if f == int(f):
                 return str(int(f))
+            return value.replace(".", ",")
         except (ValueError, OverflowError):
             pass
     return value

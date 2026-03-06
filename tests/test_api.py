@@ -16,9 +16,9 @@ class TestFormatWireValue:
         """20.0 (whole number float) should become '20'."""
         assert _format_wire_value("20.0") == "20"
 
-    def test_decimal_fraction_preserved(self):
-        """20.5 (meaningful decimal) should remain '20.5'."""
-        assert _format_wire_value("20.5") == "20.5"
+    def test_decimal_fraction_uses_comma(self):
+        """20.5 (meaningful decimal) should become '20,5' (comma separator)."""
+        assert _format_wire_value("20.5") == "20,5"
 
     def test_integer_passthrough(self):
         """'20' (no decimal point) should pass through unchanged."""
@@ -28,9 +28,9 @@ class TestFormatWireValue:
         """'-5.0' (negative whole number float) should become '-5'."""
         assert _format_wire_value("-5.0") == "-5"
 
-    def test_small_decimal_preserved(self):
-        """'0.5' (fractional below 1) should remain '0.5'."""
-        assert _format_wire_value("0.5") == "0.5"
+    def test_small_decimal_uses_comma(self):
+        """'0.5' (fractional below 1) should become '0,5' (comma separator)."""
+        assert _format_wire_value("0.5") == "0,5"
 
     def test_large_whole_number_strips_decimal(self):
         """'100.0' (large whole number float) should become '100'."""
