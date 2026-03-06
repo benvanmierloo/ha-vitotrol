@@ -51,7 +51,9 @@ class AttrMeta:
 class ClimateMeta:
     """Configuration for the climate composite entity."""
 
-    current_temp_attr: int
+    entity_key: str  # unique_id suffix, e.g. "climate" or "climate_hc2"
+    circuit_name: str  # display name, e.g. "Heating" or "Heating HC2"
+    current_temp_attr: int | None
     target_temp_attr: int
     operating_mode_attr: int
     resolve_action: Callable[
@@ -234,6 +236,7 @@ _TABLE: list[tuple[int, str, bool, str]] = [
     (5274,  "Solar pump",                        False,  "running"),
 
     # ---- Heating circuit 2 (HC2) -----------------------------------------
+    (5376,  "Room temperature HC2",              False,  "temp"),
     (709,   "Current operating mode HC2",        False,  "enum"),
     (77,    "Party mode status HC2",             False,  "bool"),
     (89,    "Energy saving status HC2",          False,  "bool"),
@@ -580,10 +583,26 @@ def _heat_pump_action(
 # Climate configuration
 # ============================================================================
 
+_BOILER_HVAC_TO_VITOTROL: dict[HVACMode, str] = {
+    HVACMode.OFF: "0",         # Abschalt
+    HVACMode.DRY: "1",         # Nur WW (DHW only)
+    HVACMode.AUTO: "2",        # Heizen + WW (schedule-driven)
+}
+
+_BOILER_VITOTROL_TO_HVAC: dict[str, HVACMode] = {
+    "0": HVACMode.OFF,         # Abschalt
+    "1": HVACMode.DRY,         # Nur WW (DHW only)
+    "2": HVACMode.AUTO,        # Heizen + WW
+    "3": HVACMode.AUTO,        # Dauernd Reduziert (still heating)
+    "4": HVACMode.AUTO,        # Dauernd Normal (still heating)
+}
+
 CLIMATE_CONFIGS: list[ClimateMeta] = [
-    # Boilers (Vitodens, Vitovalor, etc.)
+    # ---- Boiler HC1 (A1, direct circuit) ------------------------------------
     ClimateMeta(
-        current_temp_attr=5367,     # Indoor temperature
+        entity_key="climate",       # backwards-compatible unique_id
+        circuit_name="Heating",
+        current_temp_attr=5367,     # Indoor temperature (temp_rts_r)
         target_temp_attr=82,        # Room temperature setpoint (RW)
         operating_mode_attr=92,     # Operating mode (RW, enum 0-4)
         resolve_action=_boiler_action,
@@ -591,21 +610,43 @@ CLIMATE_CONFIGS: list[ClimateMeta] = [
         burner_state_attr=600,      # Burner state (RO)
         eco_mode_attr=7852,         # Energy saving mode (RW)
         party_mode_attr=7855,       # Party mode (RW)
-        hvac_to_vitotrol={
-            HVACMode.OFF: "0",         # Abschalt
-            HVACMode.DRY: "1",         # Nur WW (DHW only)
-            HVACMode.AUTO: "2",        # Heizen + WW (schedule-driven)
-        },
-        vitotrol_to_hvac={
-            "0": HVACMode.OFF,         # Abschalt
-            "1": HVACMode.DRY,         # Nur WW (DHW only)
-            "2": HVACMode.AUTO,        # Heizen + WW
-            "3": HVACMode.AUTO,        # Dauernd Reduziert (still heating)
-            "4": HVACMode.AUTO,        # Dauernd Normal (still heating)
-        },
+        hvac_to_vitotrol=_BOILER_HVAC_TO_VITOTROL,
+        vitotrol_to_hvac=_BOILER_VITOTROL_TO_HVAC,
     ),
-    # Heat pumps (VT 200, Vitocal, etc.)
+    # ---- Boiler HC2 (M2, mixer circuit) -------------------------------------
     ClimateMeta(
+        entity_key="climate_hc2",
+        circuit_name="Heating HC2",
+        current_temp_attr=5376,     # Room temperature HC2 (temp_rts_r)
+        target_temp_attr=83,        # Room temperature setpoint HC2 (RW)
+        operating_mode_attr=94,     # Operating mode HC2 (RW, enum 0-4)
+        resolve_action=_boiler_action,
+        current_mode_attr=709,      # Current operating mode HC2 (RO)
+        burner_state_attr=600,      # Burner state (shared, RO)
+        eco_mode_attr=7853,         # Energy saving mode HC2 (RW)
+        party_mode_attr=7856,       # Party mode HC2 (RW)
+        hvac_to_vitotrol=_BOILER_HVAC_TO_VITOTROL,
+        vitotrol_to_hvac=_BOILER_VITOTROL_TO_HVAC,
+    ),
+    # ---- Boiler HC3 (M3, mixer circuit) -------------------------------------
+    ClimateMeta(
+        entity_key="climate_hc3",
+        circuit_name="Heating HC3",
+        current_temp_attr=None,     # Room temp sensor ID unknown for HC3
+        target_temp_attr=84,        # Room temperature setpoint HC3 (RW)
+        operating_mode_attr=96,     # Operating mode HC3 (RW, enum 0-4)
+        resolve_action=_boiler_action,
+        current_mode_attr=710,      # Current operating mode HC3 (RO)
+        burner_state_attr=600,      # Burner state (shared, RO)
+        eco_mode_attr=7854,         # Energy saving mode HC3 (RW)
+        party_mode_attr=7857,       # Party mode HC3 (RW)
+        hvac_to_vitotrol=_BOILER_HVAC_TO_VITOTROL,
+        vitotrol_to_hvac=_BOILER_VITOTROL_TO_HVAC,
+    ),
+    # ---- Heat pump (VT 200, Vitocal, etc.) ----------------------------------
+    ClimateMeta(
+        entity_key="climate",       # only one HC expected for heat pumps
+        circuit_name="Heating",
         current_temp_attr=7299,     # Indoor temperature (temp_rts_r)
         target_temp_attr=6369,      # Room temperature setpoint (RW)
         operating_mode_attr=7373,   # Operating mode (RW, enum)

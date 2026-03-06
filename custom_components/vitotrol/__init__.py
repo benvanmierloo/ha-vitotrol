@@ -8,7 +8,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import VitotrolAPI, VitotrolError
@@ -53,25 +52,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: VitotrolConfigEntry) -> 
         raise ConfigEntryNotReady(f"Failed to connect: {err}") from err
 
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-    coordinator = VitotrolCoordinator(hass, api, devices, scan_interval, config_entry=entry)
+    coordinator = VitotrolCoordinator(hass, api, devices, config_entry=entry, scan_interval=scan_interval)
 
-    # Discover all device attributes via GetTypeInfo
-    try:
-        await coordinator.async_setup_type_info()
-    except VitotrolError as err:
-        raise ConfigEntryNotReady(
-            f"Failed to discover device attributes: {err}"
-        ) from err
-
-    # Pre-seed coordinator with entity registrations from the HA entity
-    # registry so the first refresh polls the right set of attributes
-    # (not just the enabled-by-default fallback).
-    entity_reg = er.async_get(hass)
-    registry_entries = er.async_entries_for_config_entry(
-        entity_reg, entry.entry_id
-    )
-    coordinator.pre_seed_from_registry(registry_entries)
-
+    # _async_setup (GetTypeInfo + pre-seed) runs automatically inside first refresh.
     await coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = VitotrolRuntimeData(api=api, coordinator=coordinator)

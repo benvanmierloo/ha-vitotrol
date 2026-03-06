@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import timedelta
@@ -70,8 +71,8 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
         hass: HomeAssistant,
         api: VitotrolAPI,
         devices: list[VitotrolDevice],
+        config_entry: ConfigEntry,
         scan_interval: int = DEFAULT_SCAN_INTERVAL,
-        config_entry: ConfigEntry | None = None,
     ) -> None:
         super().__init__(
             hass,
@@ -82,6 +83,7 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
         )
         self.api = api
         self.devices = devices
+        self._write_lock = asyncio.Lock()
         # Per-device attribute catalog from GetTypeInfo: {device_id: {attr_id: info}}
         self._attribute_catalog: dict[int, dict[int, AttributeTypeInfo]] = {}
         # Per-entity attr_id registrations: {device_id: {entity_uid: {attr_ids}}}
@@ -93,11 +95,14 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
         """Return the attribute catalog for a device."""
         return self._attribute_catalog.get(device_id, {})
 
-    async def async_setup_type_info(self) -> None:
-        """Discover all device attributes via GetTypeInfo.
+    async def _async_setup(self) -> None:
+        """Set up the coordinator (called by async_config_entry_first_refresh).
 
-        Must be called before the first data refresh.
+        Discovers all device attributes via GetTypeInfo and pre-seeds
+        entity attr registrations from the HA entity registry so the
+        first refresh polls the correct set of attributes.
         """
+        # 1. Discover attributes
         for device in self.devices:
             catalog = await self.api.get_type_info(device)
             if not catalog:
@@ -119,21 +124,20 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
             if _LOGGER.isEnabledFor(logging.DEBUG):
                 _log_attribute_catalog(device, catalog)
 
-    # ------------------------------------------------------------------
-    # Pre-seed from entity registry (before first refresh)
-    # ------------------------------------------------------------------
+        # 2. Pre-seed from entity registry
+        self._pre_seed_from_registry()
 
-    def pre_seed_from_registry(
-        self, registry_entries: list,
-    ) -> None:
-        """Pre-populate entity attr registrations from the HA entity registry.
+    def _pre_seed_from_registry(self) -> None:
+        """Pre-populate entity attr registrations from the HA entity registry."""
+        from homeassistant.helpers import entity_registry as er
 
-        Called before the first data refresh so that the coordinator polls
-        the correct attributes immediately, rather than falling back to
-        only the enabled-by-default set.
-        """
         from .attributes import CLIMATE_CONFIGS
         from .entity import entity_key_for_attr
+
+        entity_reg = er.async_get(self.hass)
+        registry_entries = er.async_entries_for_config_entry(
+            entity_reg, self.config_entry.entry_id
+        )
 
         for device in self.devices:
             did = device.device_id
@@ -239,13 +243,23 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
         attr_id: int,
         value: str,
     ) -> None:
-        """Write a value with re-auth retry on failure."""
-        try:
-            await self.api.write_data_wait(device, attr_id, value)
-        except VitotrolAuthError:
-            _LOGGER.debug("Auth error on write, re-logging in and retrying")
-            await self.api.login()
-            await self.api.write_data_wait(device, attr_id, value)
+        """Write a value with re-auth retry on failure.
+
+        Serialized via a lock — the SOAP write cycle is slow (~4s) and
+        concurrent writes to the same device can conflict.
+        """
+        async with self._write_lock:
+            try:
+                await self.api.write_data_wait(device, attr_id, value)
+            except VitotrolAuthError:
+                _LOGGER.debug("Auth error on write, re-logging in and retrying")
+                try:
+                    await self.api.login()
+                    await self.api.write_data_wait(device, attr_id, value)
+                except VitotrolAuthError as retry_err:
+                    raise ConfigEntryAuthFailed(
+                        f"Credentials invalid: {retry_err}"
+                    ) from retry_err
 
     async def _async_update_data(self) -> VitotrolData:
         """Fetch data from the Vitotrol API."""

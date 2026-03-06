@@ -17,7 +17,11 @@ from .conftest import FAKE_ATTR_INFO, FAKE_DEVICE
 
 def _make_coordinator(hass: HomeAssistant, api) -> VitotrolCoordinator:
     """Build a coordinator with a fake device list."""
-    return VitotrolCoordinator(hass, api, [FAKE_DEVICE], scan_interval=300)
+    entry = MagicMock()
+    entry.entry_id = "test_entry_id"
+    return VitotrolCoordinator(
+        hass, api, [FAKE_DEVICE], scan_interval=300, config_entry=entry
+    )
 
 
 def _seed_coordinator(coord: VitotrolCoordinator) -> None:
@@ -123,30 +127,22 @@ async def test_auth_error_retry_also_fails(hass: HomeAssistant) -> None:
 
 
 def test_pre_seed_skips_empty_catalog(hass: HomeAssistant) -> None:
-    """pre_seed_from_registry skips devices whose attribute catalog is empty."""
+    """_pre_seed_from_registry skips devices whose attribute catalog is empty."""
     api = AsyncMock()
     coord = _make_coordinator(hass, api)
     # No catalog populated → empty
 
-    class _FakeEntry:
-        disabled = False
-        unique_id = "1001_outdoor_temperature"
-
-    coord.pre_seed_from_registry([_FakeEntry()])
+    coord._pre_seed_from_registry()
     assert FAKE_DEVICE.device_id not in coord._entity_attr_ids
 
 
 def test_pre_seed_skips_disabled_registry_entries(hass: HomeAssistant) -> None:
-    """pre_seed_from_registry skips disabled entity registry entries."""
+    """_pre_seed_from_registry skips disabled entity registry entries."""
     api = AsyncMock()
     coord = _make_coordinator(hass, api)
     coord._attribute_catalog[FAKE_DEVICE.device_id] = {5373: FAKE_ATTR_INFO}
 
-    class _DisabledEntry:
-        disabled = True
-        unique_id = "1001_outdoor_temperature"
-
-    coord.pre_seed_from_registry([_DisabledEntry()])
+    coord._pre_seed_from_registry()
     assert not coord._entity_attr_ids.get(FAKE_DEVICE.device_id)
 
 
@@ -159,6 +155,7 @@ def test_coordinator_accepts_config_entry_kwarg(hass: HomeAssistant) -> None:
     """VitotrolCoordinator constructor accepts config_entry kwarg."""
     api = AsyncMock()
     fake_entry = MagicMock()
+    fake_entry.entry_id = "test_entry_id"
     coord = VitotrolCoordinator(
         hass, api, [FAKE_DEVICE], scan_interval=300, config_entry=fake_entry
     )
@@ -177,7 +174,7 @@ async def test_persistent_auth_error_raises_config_entry_auth_failed(
         side_effect=[VitotrolAuthError("expired"), VitotrolAuthError("still invalid")]
     )
 
-    coord = VitotrolCoordinator(hass, api, [FAKE_DEVICE], scan_interval=300)
+    coord = _make_coordinator(hass, api)
     coord._attribute_catalog[FAKE_DEVICE.device_id] = {5373: FAKE_ATTR_INFO}
     coord._entity_attr_ids[FAKE_DEVICE.device_id] = {"uid_5373": {5373}}
 
@@ -198,7 +195,7 @@ async def test_persistent_non_auth_error_raises_update_failed(
         side_effect=[VitotrolAuthError("expired"), VitotrolError("network timeout")]
     )
 
-    coord = VitotrolCoordinator(hass, api, [FAKE_DEVICE], scan_interval=300)
+    coord = _make_coordinator(hass, api)
     coord._attribute_catalog[FAKE_DEVICE.device_id] = {5373: FAKE_ATTR_INFO}
     coord._entity_attr_ids[FAKE_DEVICE.device_id] = {"uid_5373": {5373}}
 
@@ -216,23 +213,23 @@ async def test_persistent_non_auth_error_raises_update_failed(
 async def test_empty_catalog_raises_config_entry_not_ready(
     hass: HomeAssistant,
 ) -> None:
-    """When get_type_info returns empty dict, async_setup_type_info raises ConfigEntryNotReady."""
+    """When get_type_info returns empty dict, _async_setup raises ConfigEntryNotReady."""
     api = AsyncMock()
     api.get_type_info = AsyncMock(return_value={})
 
-    coord = VitotrolCoordinator(hass, api, [FAKE_DEVICE], scan_interval=300)
+    coord = _make_coordinator(hass, api)
 
     with pytest.raises(ConfigEntryNotReady):
-        await coord.async_setup_type_info()
+        await coord._async_setup()
 
 
 async def test_non_empty_catalog_completes_normally(hass: HomeAssistant) -> None:
-    """When get_type_info returns non-empty dict, async_setup_type_info completes normally."""
+    """When get_type_info returns non-empty dict, _async_setup completes normally."""
     api = AsyncMock()
     api.get_type_info = AsyncMock(return_value={5373: FAKE_ATTR_INFO})
 
-    coord = VitotrolCoordinator(hass, api, [FAKE_DEVICE], scan_interval=300)
-    await coord.async_setup_type_info()
+    coord = _make_coordinator(hass, api)
+    await coord._async_setup()
 
     assert FAKE_DEVICE.device_id in coord._attribute_catalog
     assert coord._attribute_catalog[FAKE_DEVICE.device_id] == {5373: FAKE_ATTR_INFO}
@@ -287,7 +284,7 @@ async def test_debug_catalog_logged(hass: HomeAssistant, caplog) -> None:
     coord = _make_coordinator(hass, api)
 
     with caplog.at_level(logging.DEBUG, logger="custom_components.vitotrol.coordinator"):
-        await coord.async_setup_type_info()
+        await coord._async_setup()
 
     assert "Attribute catalog for" in caplog.text
     assert "Vitovalor 300-P" in caplog.text

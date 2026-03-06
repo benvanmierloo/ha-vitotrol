@@ -48,7 +48,6 @@ async def async_setup_entry(
                 entities.append(
                     VitotrolClimate(coordinator, device, catalog, config)
                 )
-                break
 
     async_add_entities(entities)
 
@@ -67,7 +66,6 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
         | ClimateEntityFeature.TURN_ON
         | ClimateEntityFeature.TURN_OFF
     )
-    _attr_translation_key = "heating"
     _enable_turn_on_off_backwards_compat = False
 
     def __init__(
@@ -77,7 +75,8 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
         catalog: dict,
         climate_config: ClimateMeta,
     ) -> None:
-        super().__init__(coordinator, device, "climate")
+        super().__init__(coordinator, device, climate_config.entity_key)
+        self._attr_name = climate_config.circuit_name
         self._cfg = climate_config
         self._attr_hvac_modes = list(self._cfg.hvac_to_vitotrol.keys())
 
@@ -104,11 +103,11 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
     def _polling_attr_ids(self) -> set[int]:
         """Climate reads multiple attributes."""
         ids = {
-            self._cfg.current_temp_attr,
             self._cfg.target_temp_attr,
             self._cfg.operating_mode_attr,
         }
         for opt in (
+            self._cfg.current_temp_attr,
             self._cfg.current_mode_attr,
             self._cfg.burner_state_attr,
             self._cfg.eco_mode_attr,
@@ -121,6 +120,8 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
     @property
     def current_temperature(self) -> float | None:
         """Return the current indoor temperature."""
+        if self._cfg.current_temp_attr is None:
+            return None
         raw = self._get_attr_value(self._cfg.current_temp_attr)
         if raw is None:
             return None
@@ -284,7 +285,14 @@ class VitotrolClimate(VitotrolEntity, ClimateEntity):
                     self._update_coordinator_data(party_attr, "0")
 
         except Exception as err:
-            # Restore all attrs that may have been touched
+            # Restore coordinator state; note that writes already sent to the
+            # device cannot be rolled back, so device state may be inconsistent
+            # until the next poll cycle.
+            _LOGGER.warning(
+                "Climate %s: preset write failed mid-sequence — device state "
+                "may be inconsistent until next refresh",
+                self._device.device_name,
+            )
             if eco_attr is not None and old_eco is not None:
                 self._update_coordinator_data(eco_attr, old_eco)
             if party_attr is not None and old_party is not None:
