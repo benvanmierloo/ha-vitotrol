@@ -167,7 +167,11 @@ _TABLE: list[tuple[int, str, bool, str]] = [
     (88,    "Energy saving status",              False,  "bool"),
     (270,   "External mode switch",              False,  "bool"),
     (7987,  "Heating circuit 1 type",            False,  "enum"),
+    (7179,  "Hot water charging status",          False,  "enum"),
     (10761, "Hot water sensor status",           False,  "enum"),
+    (10796, "Room temp sensor 1 status",         False,  "enum"),
+    (10797, "Room temp sensor 2 status",         False,  "enum"),
+    (10800, "Room temp sensor 3 status",         False,  "enum"),
     (12526, "Fuel cell maintenance status",      False,  "enum"),
 
     # ---- Other sensors ------------------------------------------------------
@@ -247,6 +251,9 @@ _TABLE: list[tuple[int, str, bool, str]] = [
     (94,    "Operating mode HC2",                False,  "select"),
     (307,   "Holiday start date HC2",            False,  "date"),
     (310,   "Holiday end date HC2",              False,  "date"),
+    (7194,  "Heating schedule HC2",              False,  "none"),
+    (7195,  "Hot water schedule HC2",            False,  "none"),
+    (7196,  "Circulation schedule HC2",          False,  "none"),
 
     # ---- Heating circuit 3 (HC3) -----------------------------------------
     (710,   "Current operating mode HC3",        False,  "enum"),
@@ -370,7 +377,20 @@ _ENUM_MAPS: dict[int, dict[str, str]] = {
     709:   {"0": "Standby", "1": "Reduced", "2": "Normal", "3": "Continuous normal"},
     710:   {"0": "Standby", "1": "Reduced", "2": "Normal", "3": "Continuous normal"},
     7987:  {"0": "Not present", "1": "Direct circuit", "2": "Mixer circuit"},
+    7179:  {"0": "Inactive", "1": "Charging", "2": "Afterrun"},
     10761: {
+        "0": "OK", "1": "Short circuit", "2": "Open circuit",
+        "3": "Unknown", "4": "Unknown", "5": "Unknown", "6": "Not present",
+    },
+    10796: {
+        "0": "OK", "1": "Short circuit", "2": "Open circuit",
+        "3": "Unknown", "4": "Unknown", "5": "Unknown", "6": "Not present",
+    },
+    10797: {
+        "0": "OK", "1": "Short circuit", "2": "Open circuit",
+        "3": "Unknown", "4": "Unknown", "5": "Unknown", "6": "Not present",
+    },
+    10800: {
         "0": "OK", "1": "Short circuit", "2": "Open circuit",
         "3": "Unknown", "4": "Unknown", "5": "Unknown", "6": "Not present",
     },
