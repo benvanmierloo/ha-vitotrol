@@ -1,6 +1,6 @@
 # Viessmann Vitotrol for Home Assistant
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
+[![HACS Default](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.12%2B-blue.svg)](https://www.home-assistant.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![GitHub Issues](https://img.shields.io/github/issues/benvanmierloo/ha-vitotrol)](https://github.com/benvanmierloo/ha-vitotrol/issues)
@@ -34,10 +34,8 @@ The integration queries your device for its full attribute catalog (`GetTypeInfo
 ### HACS (recommended)
 
 1. Open HACS in Home Assistant
-2. Click the three dots in the top right corner and select **Custom repositories**
-3. Add `https://github.com/benvanmierloo/ha-vitotrol` as an **Integration**
-4. Search for **Viessmann Vitotrol** in HACS and install it
-5. Restart Home Assistant
+2. Search for **Viessmann Vitotrol** and install it
+3. Restart Home Assistant
 
 ### Manual
 
