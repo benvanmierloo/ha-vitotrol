@@ -55,6 +55,18 @@ class VitotrolAuthError(VitotrolError):
     """Authentication failure."""
 
 
+class VitotrolSessionError(VitotrolError):
+    """Session missing or expired (result code 6); a fresh login fixes it.
+
+    Deliberately not a VitotrolAuthError: the credentials are fine, so this
+    must never lead to a reauth flow.
+    """
+
+
+# "Keine aktive/gültige Session" (no active/valid session)
+_RESULT_SESSION_INVALID = 6
+
+
 @dataclass
 class VitotrolDevice:
     """Represents a Viessmann device discovered via GetDevices."""
@@ -453,6 +465,10 @@ class VitotrolAPI:
             if soap_action == "Login":
                 raise VitotrolAuthError(
                     f"Login failed: {error_text} (code {result_code})"
+                )
+            if result_code == _RESULT_SESSION_INVALID:
+                raise VitotrolSessionError(
+                    f"{soap_action} failed: {error_text} (code {result_code})"
                 )
             raise VitotrolError(
                 f"{soap_action} failed: {error_text} (code {result_code})"

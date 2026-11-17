@@ -12,7 +12,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import AttributeTypeInfo, VitotrolAPI, VitotrolAuthError, VitotrolDevice, VitotrolError
+from .api import (
+    AttributeTypeInfo,
+    VitotrolAPI,
+    VitotrolAuthError,
+    VitotrolDevice,
+    VitotrolError,
+    VitotrolSessionError,
+)
 from .attributes import ATTRIBUTE_REGISTRY
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
@@ -251,8 +258,10 @@ class VitotrolCoordinator(DataUpdateCoordinator[VitotrolData]):
         async with self._write_lock:
             try:
                 await self.api.write_data_wait(device, attr_id, value)
-            except VitotrolAuthError:
-                _LOGGER.debug("Auth error on write, re-logging in and retrying")
+            except (VitotrolAuthError, VitotrolSessionError) as err:
+                _LOGGER.debug(
+                    "Session error on write (%s), re-logging in and retrying", err
+                )
                 try:
                     await self.api.login()
                     await self.api.write_data_wait(device, attr_id, value)
