@@ -72,7 +72,7 @@ The code has five layers, each depending only on the layer below.
 
 Pure async Python SOAP client with no Home Assistant dependencies.
 
-- **`VitotrolAPI`** — Manages SOAP communication via `aiohttp`. Handles cookie-based sessions using a private dict (not HA's shared cookie jar). Provides typed methods for each SOAP operation and implements the async wait pattern for RefreshData/WriteData. Raises `VitotrolError` / `VitotrolAuthError` on failures.
+- **`VitotrolAPI`** — Manages SOAP communication via `aiohttp`. Handles cookie-based sessions using a private dict (not HA's shared cookie jar). Provides typed methods for each SOAP operation and implements the async wait pattern for RefreshData/WriteData. Raises `VitotrolError` on failures, with two subclasses: `VitotrolAuthError` (Login rejected: bad credentials, triggers reauth) and `VitotrolSessionError` (result code 6: session expired, fixed by a fresh login).
 - **`VitotrolDevice`** — Dataclass holding device identity (location_id, device_id, names) and status flags (has_error, is_connected).
 
 ### Layer 2: Coordinator (`coordinator.py`)

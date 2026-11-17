@@ -214,7 +214,7 @@ Heat pump devices (VT 200, Vitocal) use a separate set of attribute IDs (mostly 
 
 1. **Unsupported attributes break the whole request.** If you include an attribute ID the device doesn't support, the entire SOAP call fails. Always use `GetTypeInfo` to discover valid attributes first.
 
-2. **Session lifetime is unknown.** The original Go implementation re-authenticates every loop. This integration logs in once and re-authenticates on any API error.
+2. **Session lifetime is unknown.** The original Go implementation re-authenticates every loop. This integration logs in once and re-authenticates on error: polls re-login on any API error, writes re-login when the session has expired. An expired or missing session is reported by every operation as `Ergebnis` 6, `ErgebnisText` "Keine aktive/gültige Session"; the client raises it as `VitotrolSessionError`.
 
 3. **No documented rate limits.** The API was designed for a single mobile app, so avoid aggressive polling.
 
