@@ -6,6 +6,15 @@
 [![GitHub Issues](https://img.shields.io/github/issues/benvanmierloo/ha-vitotrol)](https://github.com/benvanmierloo/ha-vitotrol/issues)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-donate-yellow.svg)](https://buymeacoffee.com/benvanmierloo)
 
+> [!WARNING]
+> **Viessmann is shutting down the Vitotrol servers on 30 November 2027.**
+>
+> Viessmann Deutschland has notified customers (reported in [#13](https://github.com/benvanmierloo/ha-vitotrol/issues/13), which includes the letter) that it is terminating the Vitodata 100 / Vitotrol app service and will cease operation of the Vitodata and Vitotrol servers on that date. The reason given is that the platform cannot be updated to meet the EU Cyber Resilience Act, which applies from 11 December 2027.
+>
+> This integration depends entirely on that cloud API, so **it will stop working when the servers are switched off**. There is nothing this project can do to work around that. Until then it keeps working as usual.
+>
+> Viessmann's suggested replacement is to swap the Vitocom 100/200 for a [Vitoconnect](https://www.viessmann.de/vitoconnect) (requires a control unit with an Optolink interface), which uses ViCare instead. Ask your Viessmann installer about compatibility. In Home Assistant, Vitoconnect devices are covered by the official [ViCare integration](https://www.home-assistant.io/integrations/vicare/).
+
 A Home Assistant custom integration for **Viessmann heating systems** that use the Vitotrol mobile app. Connects directly to the Viessmann cloud API.
 
 ## What you get
