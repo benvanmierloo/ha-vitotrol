@@ -9,7 +9,7 @@
 > [!WARNING]
 > **Viessmann is shutting down the Vitotrol servers on 30 November 2027.**
 >
-> Viessmann Deutschland has notified customers that it is terminating the Vitodata 100 / Vitotrol app service and will cease operation of the Vitodata and Vitotrol servers on that date. The reason given is that the platform cannot be updated to meet the EU Cyber Resilience Act, which applies from 11 December 2027.
+> Viessmann Deutschland has notified customers (reported in [#13](https://github.com/benvanmierloo/ha-vitotrol/issues/13), which includes the letter) that it is terminating the Vitodata 100 / Vitotrol app service and will cease operation of the Vitodata and Vitotrol servers on that date. The reason given is that the platform cannot be updated to meet the EU Cyber Resilience Act, which applies from 11 December 2027.
 >
 > This integration depends entirely on that cloud API, so **it will stop working when the servers are switched off**. There is nothing this project can do to work around that. Until then it keeps working as usual.
 >
